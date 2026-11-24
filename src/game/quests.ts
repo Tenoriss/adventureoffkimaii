@@ -61,11 +61,6 @@ export const QUESTS: QuestDef[] = [
     summary: 'Tovin lost his lucky lure at Saltmarsh. There is more to the story.',
     requires: ['q3_bright_water'],
     objectives: [
-      {
-        text: 'Follow the coast road to Saltmarsh',
-        target: 'village',
-        zone: { x: 330, z: 300, radius: 28 },
-      },
       { text: 'Recover the lure near the northern lake', target: 'lake', hint: 'Where the shore turns to stone.' },
       { text: 'Return the lure to Tovin', target: 'village' },
     ],

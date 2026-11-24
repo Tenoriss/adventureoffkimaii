@@ -18,7 +18,7 @@ import {
   buildGrassTuft,
   buildMushroom,
 } from './props';
-import { FOREST_GROVES, ROADS, VILLAGES, WAYSTONES, CAVE, WORLD_RADIUS } from './features';
+import { FOREST_GROVES, ROADS, VILLAGES, WAYSTONES, CAVE, SHORE_STONES, WORLD_RADIUS } from './features';
 import type { QualityPreset } from '../config/quality';
 
 const GRASS_COLORS = [0x8ab35c, 0x79a44f, 0x9cbf68, 0x6d9647];
@@ -126,6 +126,8 @@ export function vegetationDensity(x: number, z: number, slope: number, roadDist:
   density *= smoothstep(4.5, 11, roadDist);
   // Keep landmark sightlines open: waystones and the cave mouth sit in clearings.
   for (const w of WAYSTONES) density *= smoothstep(5, 12, Math.hypot(x - w.x, z - w.z));
+  // Shore stones sit right on the waterline; keep the bank walkable around them.
+  for (const s of SHORE_STONES) density *= smoothstep(6, 14, Math.hypot(x - s.x, z - s.z));
   density *= smoothstep(CAVE.radius * 0.9, CAVE.radius + 16, Math.hypot(x - CAVE.x, z - CAVE.z));
   for (const v of VILLAGES) {
     const d = Math.hypot(x - v.x, z - v.z);

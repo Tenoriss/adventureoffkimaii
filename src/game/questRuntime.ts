@@ -53,6 +53,19 @@ export function notifyTalked(npcId: string): void {
   }
 }
 
+/**
+ * The final quest's first two steps are the same arrival: standing at the
+ * Starlit Cairn. Advancing a step at a time is enough because the cairn
+ * interaction loops until both route markers are satisfied.
+ */
+export function notifyCairnReached(): void {
+  const store = useGame.getState();
+  if (store.quests['q6_starlit_ascent']?.status !== 'active') return;
+  while ((useGame.getState().quests['q6_starlit_ascent']?.progress ?? 0) < 2) {
+    if (!tryAdvance('q6_starlit_ascent')) break;
+  }
+}
+
 /** Called every frame with the player position. */
 export function notifyPosition(x: number, z: number): void {
   const store = useGame.getState();
@@ -66,30 +79,27 @@ export function notifyPosition(x: number, z: number): void {
   }
 }
 
-/** Item-driven objectives (herbs, stones, shards). */
+/**
+ * Item-driven objectives (herbs, stones, shards). Called on every inventory
+ * change and on quest events; each rule checks the objective the player is
+ * currently on, so a pick-up can never skip a step. Hand-ins stay in dialogue.
+ */
 export function notifyInventoryChange(): void {
   const store = useGame.getState();
-  const active = (id: string) => store.quests[id]?.status === 'active';
-  const progress = (id: string) => store.quests[id]?.progress ?? 0;
+  const onObjective = (id: string, index: number) =>
+    store.quests[id]?.status === 'active' && (store.quests[id]?.progress ?? -1) === index;
 
-  if (active('q1_first_steps') && progress('q1_first_steps') === 2 && store.countItem('sunleaf') >= 3) {
-    tryAdvance('q1_first_steps');
-  }
-  if (active('q2_long_dark') && progress('q2_long_dark') === 2 && store.countItem('waystone_shard') > 0) {
-    tryAdvance('q2_long_dark');
-  }
-  if (active('q3_bright_water') && progress('q3_bright_water') === 1 && store.countItem('riverstone') >= 3) {
-    tryAdvance('q3_bright_water');
-  }
-  if (active('q4_dead_mans_lure') && progress('q4_dead_mans_lure') === 1 && store.countItem('fishermans_lure') > 0) {
-    tryAdvance('q4_dead_mans_lure');
-  }
-  if (active('q5_stone_song')) {
+  if (onObjective('q1_first_steps', 2) && store.countItem('sunleaf') >= 3) tryAdvance('q1_first_steps');
+  if (onObjective('q2_long_dark', 2) && store.countItem('waystone_shard') > 0) tryAdvance('q2_long_dark');
+  if (onObjective('q3_bright_water', 1) && store.countItem('riverstone') >= 3) tryAdvance('q3_bright_water');
+
+  // Waking all three stones completes the song; the scholar's final request
+  // becomes available afterwards.
+  if (store.quests['q5_stone_song']?.status === 'active') {
     const lit = store.discovered.filter((d) => d.startsWith('Waystone of')).length;
-    if (lit >= 3 && progress('q5_stone_song') < 3) {
+    if (lit >= 3) {
       store.completeQuest('q5_stone_song');
       store.pushToast({ text: '“The Song of Stones” complete', kind: 'quest' });
-      // Wake the scholar's final request.
       store.setQuestStatus('q6_starlit_ascent', 'available');
     }
   }

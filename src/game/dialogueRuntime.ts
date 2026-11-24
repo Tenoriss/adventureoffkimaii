@@ -3,6 +3,7 @@ import { DIALOGUE, NPC_MAP, resolveEntry, type DlgCtx } from './dialogue';
 import type { DialogueAction, DialogueNode } from './types';
 import { bus } from './bus';
 import { ITEMS } from '../config/items';
+import { QUESTS } from './quests';
 import { POWER_UPS, type PowerupKind } from './powerups';
 
 export interface DialogueRuntimeState {
@@ -76,10 +77,13 @@ export class DialogueController {
       case 'giveQuest': {
         const quest = action.questId;
         const state = store().quests[quest];
-        if (!state || state.status === 'locked') {
+        // 'available' quests (unlocked by earlier progress) must be startable
+        // too, otherwise the final quest can be offered but never accepted.
+        if (!state || state.status === 'locked' || state.status === 'available') {
           store().startQuest(quest);
           bus.emit('playSfx', { name: 'quest' });
-          store().pushToast({ text: 'New quest accepted', kind: 'quest' });
+          const title = QUESTS.find((q) => q.id === quest)?.title;
+          store().pushToast({ text: title ? `Quest started · ${title}` : 'New quest accepted', kind: 'quest' });
         }
         break;
       }
@@ -90,7 +94,9 @@ export class DialogueController {
       case 'completeQuest': {
         if (store().quests[action.questId]?.status !== 'complete') {
           store().completeQuest(action.questId);
-          store().pushToast({ text: 'Quest complete', kind: 'quest' });
+          if (action.questId === 'q6_starlit_ascent') store().setFlag('q6_complete', true);
+          const title = QUESTS.find((q) => q.id === action.questId)?.title;
+          store().pushToast({ text: title ? `Quest complete · ${title}` : 'Quest complete', kind: 'quest' });
           bus.emit('playSfx', { name: 'quest' });
         }
         break;
@@ -132,7 +138,9 @@ export class DialogueController {
         if (action.itemId) store().removeItem(action.itemId, action.qty ?? 1);
         if (store().quests[action.questId]?.status !== 'complete') {
           store().completeQuest(action.questId);
-          store().pushToast({ text: 'Quest complete', kind: 'quest' });
+          if (action.questId === 'q6_starlit_ascent') store().setFlag('q6_complete', true);
+          const title = QUESTS.find((q) => q.id === action.questId)?.title;
+          store().pushToast({ text: title ? `Quest complete · ${title}` : 'Quest complete', kind: 'quest' });
           bus.emit('playSfx', { name: 'quest' });
         }
         break;

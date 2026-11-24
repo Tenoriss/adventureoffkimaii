@@ -15,13 +15,26 @@ import {
   buildReeds,
   buildFlower,
   buildMushroom,
+  buildRiverstone,
   buildBird,
   buildFish,
   type CharacterRig,
   buildCharacter,
 } from './props';
 import { sampleHeight, sampleSlope, WATER_LEVEL } from './terrain';
-import { VILLAGES, WAYSTONES, CAVE, HERBS, RIVERS, LAKES, ROADS, WORLD_RADIUS, type Vec2 } from './features';
+import {
+  VILLAGES,
+  WAYSTONES,
+  CAVE,
+  LURE,
+  HERBS,
+  SHORE_STONES,
+  RIVERS,
+  LAKES,
+  ROADS,
+  WORLD_RADIUS,
+  type Vec2,
+} from './features';
 import { hash2i, mulberry32, clamp, lerp, smoothstep } from './noise';
 import { NPCS } from '../game/dialogue';
 import { POWERUP_SPOTS, POWER_UPS, type PowerupKind } from '../game/powerups';
@@ -291,6 +304,40 @@ export class Scenery {
     }
     this.herbMesh = this.place(herbGeo, herbMat, herbEntries, false, shadows);
 
+    // ---------------- Shore stones (q3: riverstones at Mirror Lake) -------------
+    const shoreGeo = this.geo(buildRiverstone());
+    const shoreMat = this.mat(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x14232a }));
+    const stoneEntries: { x: number; y: number; z: number; rot: number; scale: number }[] = [];
+    for (const spot of SHORE_STONES) {
+      const sy = sampleHeight(spot.x, spot.z);
+      if (sy < WATER_LEVEL + 0.05) continue;
+      stoneEntries.push({ x: spot.x, y: sy, z: spot.z, rot: (spot.x * 0.31 + spot.z * 0.17) % 6.28, scale: 1 });
+      interactables.push({
+        id: `stone:${spot.id}`,
+        kind: 'stone',
+        label: 'Pick up a riverstone',
+        x: spot.x,
+        y: sy,
+        z: spot.z,
+        radius: 3.2,
+        data: { itemId: 'riverstone', name: 'Riverstone', qty: 1 },
+      });
+    }
+    this.place(shoreGeo, shoreMat, stoneEntries, true, shadows);
+
+    // The lost lure glints among the stones of the northern lake shore. It is
+    // picked up automatically on approach (Game.checkShorePickups) so there is
+    // no prompt to hunt for in the dark.
+    const lureGeo = this.geo(buildRiverstone());
+    const lureMat = this.mat(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6a4a12 }));
+    this.lureMesh = this.place(
+      lureGeo,
+      lureMat,
+      [{ x: LURE.x, y: sampleHeight(LURE.x, LURE.z) + 0.12, z: LURE.z, rot: 0.9, scale: 1.5 }],
+      true,
+      shadows,
+    );
+
     // Extra wild pickups: embercaps in the woods.
     if (detail) {
       const capGeo = this.geo(buildMushroom());
@@ -392,6 +439,7 @@ export class Scenery {
   }
 
   private herbMesh: THREE.InstancedMesh | null = null;
+  private lureMesh: THREE.InstancedMesh | null = null;
   private herbInstanceIndex = new Map<string, number>();
   private pickupGroup: THREE.Group | null = null;
   private pickupMeshes: { mesh: THREE.Mesh; kind: PowerupKind; baseY: number; phase: number }[] = [];
@@ -455,6 +503,15 @@ export class Scenery {
     this.herbInstanceIndex.delete(herbId);
   }
 
+  /** Removes the shore lure once Tovin's quest has been satisfied. */
+  hideLure(): void {
+    const mesh = this.lureMesh;
+    if (!mesh) return;
+    mesh.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0));
+    mesh.instanceMatrix.needsUpdate = true;
+    this.lureMesh = null;
+  }
+
   hidePickup(id: string): void {
     const idx = POWERUP_SPOTS.findIndex((s) => s.id === id);
     if (idx < 0) return;
@@ -476,6 +533,7 @@ export class Scenery {
     this.pickupMeshes = [];
     this.herbInstanceIndex.clear();
     this.herbMesh = null;
+    this.lureMesh = null;
   }
 }
 

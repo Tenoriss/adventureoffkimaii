@@ -17,12 +17,12 @@ import {
   type NPCActor,
 } from '../world/scenery';
 import { sampleHeight, WATER_LEVEL } from '../world/terrain';
-import { VILLAGES, WAYSTONES, CAVE, SPAWN, WORLD_SEED } from '../world/features';
+import { VILLAGES, WAYSTONES, CAVE, SPAWN, SHORE_STONES, LURE, WORLD_SEED } from '../world/features';
 import { NPCS } from '../game/dialogue';
 import { tryAdvance } from '../game/questRuntime';
 import { DialogueController } from '../game/dialogueRuntime';
 import { loadSaveDataIntoGame, startAutosave } from '../game/persistence';
-import { notifyInventoryChange, notifyPosition, notifyTalked } from '../game/questRuntime';
+import { notifyCairnReached, notifyInventoryChange, notifyPosition, notifyTalked } from '../game/questRuntime';
 import { useGame } from '../game/store';
 import { bus } from '../game/bus';
 import { getPreset, type QualityPreset } from '../config/quality';
@@ -364,6 +364,18 @@ export class Game {
         }
         break;
       }
+      case 'stone': {
+        const itemId = String(target.data?.itemId ?? 'riverstone');
+        const qty = Number(target.data?.qty ?? 1);
+        const def = ITEMS[itemId];
+        if (store.addItem(itemId, qty)) {
+          store.pushToast({ text: `${def?.name ?? 'Riverstone'} collected`, kind: 'item', icon: def?.icon });
+          this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.4, target.z), 0xbfe6f2, { count: 12, speed: 1.4 });
+          this.audio.play('pickup');
+          this.removeInteractable(target.id);
+        }
+        break;
+      }
       case 'chest': {
         const itemId = String(target.data?.item ?? 'trail_ration');
         const qty = Number(target.data?.qty ?? 1);
@@ -426,8 +438,16 @@ export class Game {
       }
       case 'signpost': {
         if (target.data?.cairn) {
+          // Only reachable while the final quest is running: the cairn is the
+          // objective, not a free item dispenser.
+          const finalState = store.quests['q6_starlit_ascent'];
+          if (finalState?.status !== 'active') {
+            store.pushToast({ text: 'The cairn is quiet. Something is still missing.', kind: 'info' });
+            break;
+          }
           store.setFlag('cairn_reached', true);
-          tryAdvance('q6_starlit_ascent');
+          // Climbing the peak and reaching the cairn are the same arrival.
+          notifyCairnReached();
           if (store.countItem('horizon_compass') === 0) {
             store.addItem('horizon_compass', 1);
             store.pushToast({ text: 'Horizon Compass recovered', kind: 'item', icon: 'horizon_compass' });
@@ -662,13 +682,16 @@ export class Game {
     const store = useGame.getState();
     const p = this.player.position;
     if (!this.lureTaken) {
-      const d = Math.hypot(p.x - 380, p.z - 168);
+      const d = Math.hypot(p.x - LURE.x, p.z - LURE.z);
       const inQuest = store.quests['q4_dead_mans_lure']?.status === 'active';
-      if (inQuest && d < 9) {
+      if (inQuest && d < LURE.radius) {
         this.lureTaken = true;
+        this.scenery.hideLure();
         store.addItem('fishermans_lure', 1);
         store.pushToast({ text: "Fisherman's Lure recovered", kind: 'item', icon: 'fishermans_lure' });
-        this.particles.spawn(new THREE.Vector3(380, sampleHeight(380, 168) + 0.8, 168), 0xffd479, { count: 22, speed: 2.4 });
+        // Picking the lure up satisfies the first objective (find it).
+        if ((store.quests['q4_dead_mans_lure']?.progress ?? 0) < 1) tryAdvance('q4_dead_mans_lure');
+        this.particles.spawn(new THREE.Vector3(LURE.x, sampleHeight(LURE.x, LURE.z) + 0.8, LURE.z), 0xffd479, { count: 22, speed: 2.4 });
         this.audio.play('pickup');
       }
     }
@@ -908,10 +931,23 @@ export class Game {
         if (progress <= 1) return { x: CAVE.x, z: CAVE.z, label: 'Echo Hollow' };
         return { x: -176, z: -52, label: 'Bram' };
       case 'q3_bright_water':
-        if (progress <= 1) return { x: -210, z: 190, label: 'Mirror Lake' };
+        if (progress === 0) return { x: -210, z: 190, label: 'Mirror Lake' };
+        if (progress === 1) {
+          // Point at the closest shore stone the player has not picked up.
+          let best = SHORE_STONES[0];
+          let bestD = Infinity;
+          for (const s of SHORE_STONES) {
+            const d = Math.hypot(s.x - this.player.position.x, s.z - this.player.position.z);
+            if (d < bestD) {
+              bestD = d;
+              best = s;
+            }
+          }
+          return { x: best.x, z: best.z, label: 'Riverstones' };
+        }
         return { x: 112, z: 158, label: 'Sela' };
       case 'q4_dead_mans_lure':
-        if (progress <= 1) return { x: 380, z: -210, label: 'Northern lake' };
+        if (progress === 0) return { x: LURE.x, z: LURE.z, label: 'Northern lake' };
         return { x: 336, z: 312, label: 'Tovin' };
       case 'q5_stone_song': {
         const lit = store.discovered.filter((d) => d.startsWith('Waystone of')).length;

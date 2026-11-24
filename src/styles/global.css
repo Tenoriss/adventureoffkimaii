@@ -1061,10 +1061,12 @@ input[type='range']::-moz-range-thumb {
 .dialogue-text {
   font-size: 14.5px;
   line-height: 1.62;
-  max-height: 6.5em;
-  overflow: hidden;
-  color: var(--ink);
   min-height: 3.3em;
+  /* Reserve room for the longest line in a node so the box never grows or
+     clips while the typewriter runs. */
+  max-height: none;
+  overflow: visible;
+  color: var(--ink);
   white-space: pre-wrap;
 }
 
@@ -1091,6 +1093,10 @@ input[type='range']::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+.dialogue-option:last-child {
+  margin-bottom: 2px;
 }
 
 .dialogue-option {

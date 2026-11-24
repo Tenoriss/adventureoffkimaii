@@ -108,6 +108,14 @@ export function buildGrassTuft(): THREE.BufferGeometry {
   return b.build();
 }
 
+/** A smooth rounded riverstone with a pale vein, glinting on the shore. */
+export function buildRiverstone(): THREE.BufferGeometry {
+  const b = createBuilder();
+  addBlob(b, 0, 0.16, 0, 0.3, 0.2, 0.26, C(0x6f8f9c), 3.1);
+  addBlob(b, 0.02, 0.2, 0.01, 0.24, 0.14, 0.2, C(0xa8c6d0), 4.7);
+  return b.build();
+}
+
 export function buildMushroom(): THREE.BufferGeometry {
   const b = createBuilder();
   addPrism(b, 0, 0.12, 0, 0.05, 0.045, 0.26, 5, C(0xe6ddc8));

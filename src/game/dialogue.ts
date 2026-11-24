@@ -296,6 +296,14 @@ export const DIALOGUE: Record<string, DialogueNode> = {
     ],
     options: [{ label: 'I will climb.', action: { type: 'giveQuest', questId: 'q6_starlit_ascent' } }],
   },
+  orin_follow: {
+    id: 'orin_follow',
+    lines: [
+      { speaker: 'Orin', text: 'The needle still leans north, wanderer. The peak has not moved either.', mood: 'neutral' },
+      { speaker: 'Orin', text: 'When the cairn answers you, bring the compass to a village. They should see the horizon open.', mood: 'happy' },
+    ],
+    options: [{ label: 'On my way.', action: { type: 'close' } }],
+  },
   orin_compass: {
     id: 'orin_compass',
     lines: [
@@ -325,7 +333,7 @@ export const DIALOGUE: Record<string, DialogueNode> = {
 
 export const NPC_ENTRY_ORDER: Record<string, { when: (c: DlgCtx) => boolean; entry: string; node: string }[]> = {
   mira: [
-    { when: (c) => c.flag('q6_complete'), entry: 'mira_after_all', node: 'mira_after_all' },
+    { when: (c) => c.isComplete('q6_starlit_ascent') || c.flag('q6_complete'), entry: 'mira_after_all', node: 'mira_after_all' },
     { when: (c) => c.isActive('q6_starlit_ascent') && c.flag('cairn_reached'), entry: 'mira_final', node: 'mira_final' },
     { when: (c) => c.isComplete('q1_first_steps'), entry: 'mira_followup', node: 'mira_followup' },
     { when: (c) => c.isActive('q1_first_steps'), entry: 'mira_working', node: 'mira_working' },
@@ -361,7 +369,7 @@ export const NPC_ENTRY_ORDER: Record<string, { when: (c: DlgCtx) => boolean; ent
     { when: () => true, entry: 'tovin_start', node: 'tovin_start' },
   ],
   orin: [
-    { when: (c) => c.isActive('q6_starlit_ascent'), entry: 'orin_peak', node: 'orin_peak' },
+    { when: (c) => c.isActive('q6_starlit_ascent'), entry: 'orin_follow', node: 'orin_follow' },
     { when: (c) => c.isComplete('q5_stone_song') && !c.isActive('q6_starlit_ascent'), entry: 'orin_peak', node: 'orin_peak' },
     { when: (c) => c.isActive('q5_stone_song'), entry: 'orin_stones', node: 'orin_stones' },
     { when: (c) => c.countItem('waystone_shard') > 0, entry: 'orin_start', node: 'orin_start' },

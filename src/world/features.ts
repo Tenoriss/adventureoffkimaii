@@ -50,6 +50,13 @@ export interface WaystoneDef {
   rune: string;
 }
 
+/** A shore stone that can be picked up once for a quest. */
+export interface ShoreStoneDef {
+  id: string;
+  x: number;
+  z: number;
+}
+
 export interface HerbSpotDef {
   id: string;
   x: number;
@@ -154,6 +161,12 @@ export const WAYSTONES: WaystoneDef[] = [
   { id: 'stone-peak', name: 'Waystone of Peak', x: -60, z: -372, rune: '▲' },
 ];
 
+/**
+ * Tovin's lost lure, on the shore of the northern lake (not at Saltmarsh —
+ * the quest text sends the player north, so the lure has to be there).
+ */
+export const LURE = { x: 380, z: -174, radius: 11 } as const;
+
 export const HERBS: HerbSpotDef[] = [
   { id: 'herb-1', x: 28, z: 215, name: 'Sunleaf' },
   { id: 'herb-2', x: 44, z: 196, name: 'Sunleaf' },
@@ -165,6 +178,22 @@ export const HERBS: HerbSpotDef[] = [
   { id: 'herb-8', x: 208, z: 198, name: 'Sunleaf' },
   { id: 'herb-9', x: -140, z: 268, name: 'Sunleaf' },
   { id: 'herb-10', x: 128, z: 214, name: 'Sunleaf' },
+];
+
+/**
+ * Riverstones washed up on the Mirror Lake shore (q3 asks for three). Spread
+ * over both banks so the search is a short walk, never a fetch quest.
+ */
+export const SHORE_STONES: ShoreStoneDef[] = [
+  // Exactly on the waterline (sampled from the heightfield, shoreline ring).
+  { id: 'stone-1', x: -157, z: 227 },
+  { id: 'stone-2', x: -173, z: 234 },
+  { id: 'stone-3', x: -191, z: 239 },
+  { id: 'stone-4', x: -247, z: 234 },
+  { id: 'stone-5', x: -263, z: 227 },
+  { id: 'stone-6', x: -249, z: 143 },
+  { id: 'stone-7', x: -169, z: 140 },
+  { id: 'stone-8', x: -141, z: 218 },
 ];
 
 export const CAVE: { id: string; name: string; x: number; z: number; radius: number } = {

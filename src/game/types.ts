@@ -118,7 +118,15 @@ export interface NPCDef {
   dialogue: string;
 }
 
-export type InteractableKind = 'npc' | 'herb' | 'waystone' | 'cave' | 'signpost' | 'chest' | 'campfire';
+export type InteractableKind =
+  | 'npc'
+  | 'herb'
+  | 'stone'
+  | 'waystone'
+  | 'cave'
+  | 'signpost'
+  | 'chest'
+  | 'campfire';
 
 export interface Interactable {
   id: string;
