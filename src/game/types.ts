@@ -36,6 +36,8 @@ export interface SaveData {
   stamina: number;
   inventory: { id: string; qty: number }[];
   quests: Record<string, QuestState>;
+  /** Quest the compass and beacon point at. Optional for older saves. */
+  trackedQuest?: string | null;
   flags: Record<string, boolean | number>;
   seen: string[];
   playtime: number;

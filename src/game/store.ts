@@ -322,7 +322,13 @@ export const useGame = create<GameState>((set, get) => ({
     set({ health });
     if (health > before) bus.emit('playerHealed', { amount: Math.round(health - before) });
   },
-  setStamina: (v) => set({ stamina: Math.max(0, Math.min(get().maxStamina, v)) }),
+  // Guard the no-op writes: the engine tops stamina up every frame, and while
+  // it sits at full that used to notify every subscriber 60x/s.
+  setStamina: (v) => {
+    const next = Math.max(0, Math.min(get().maxStamina, v));
+    if (next === get().stamina) return;
+    set({ stamina: next });
+  },
 
   pushToast: (t) => {
     const id = toastSeq++;
@@ -332,12 +338,19 @@ export const useGame = create<GameState>((set, get) => ({
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   hydrateFromSave: (save) => {
+    // Without a persisted tracker the guidance beacon silently disappears after
+    // "Continue", so fall back to a sane active quest (or the first one).
+    const tracked =
+      save.trackedQuest && save.quests[save.trackedQuest]?.status === 'active'
+        ? save.trackedQuest
+        : (Object.entries(save.quests ?? {}).find(([, q]) => q.status === 'active')?.[0] ?? null);
     set({
       hasSave: true,
       health: save.health,
       stamina: save.stamina,
       inventory: save.inventory,
       quests: save.quests,
+      trackedQuest: tracked,
       flags: save.flags ?? {},
       discovered: save.seen ?? [],
       timeOfDay: save.time,
@@ -356,6 +369,7 @@ export const useGame = create<GameState>((set, get) => ({
       stamina: s.stamina,
       inventory: s.inventory,
       quests: s.quests,
+      trackedQuest: s.trackedQuest,
       flags: { ...s.flags, ...saveFlags },
       seen: saveSeen,
       playtime: savePlaytime,

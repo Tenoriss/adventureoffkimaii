@@ -22,7 +22,6 @@ export function loadSaveDataIntoGame(): SaveData | null {
 }
 
 let saveUnsub: (() => void) | null = null;
-let indicatorUnsub: (() => void) | null = null;
 
 /** Wires the debounced writer to the store's `requestSave` event. */
 export function startAutosave(): () => void {
@@ -31,14 +30,10 @@ export function startAutosave(): () => void {
       useGame.getState().markSaved();
     });
   });
-  indicatorUnsub = bus.on('requestSave', () => {
-    /* marker hook for analytics / cloud sync in the future */
-  });
+  // NOTE: save diagnostics / future cloud-sync hooks belong here.
   return () => {
     saveUnsub?.();
-    indicatorUnsub?.();
     saveUnsub = null;
-    indicatorUnsub = null;
   };
 }
 
@@ -54,11 +49,15 @@ export function setupUnloadSave(): () => void {
   };
   window.addEventListener('pagehide', handler);
   window.addEventListener('beforeunload', handler);
-  document.addEventListener('visibilitychange', () => {
+  // Keep the reference so the listener can be removed again; the anonymous
+  // arrow used to leak (and kept firing after the app unmounted).
+  const onVisibility = () => {
     if (document.hidden) handler();
-  });
+  };
+  document.addEventListener('visibilitychange', onVisibility);
   return () => {
     window.removeEventListener('pagehide', handler);
     window.removeEventListener('beforeunload', handler);
+    document.removeEventListener('visibilitychange', onVisibility);
   };
 }

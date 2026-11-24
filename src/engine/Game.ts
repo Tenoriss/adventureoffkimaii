@@ -216,15 +216,18 @@ export class Game {
 
     this.visibilityHandler = () => {
       if (document.hidden) {
+        // Stop simulating (and stop the music) in a background tab.
         this.audio.suspend();
+        this.pauseForHiddenTab();
       } else {
         // Reset the frame timer so returning to the tab never produces a huge dt.
         this.lastFrameTime = performance.now();
+        this.resumeFromHiddenTab();
         if (!this.paused) this.audio.resume();
       }
     };
     document.addEventListener('visibilitychange', this.visibilityHandler);
-    window.addEventListener('orientationchange', this.resize);
+    window.addEventListener('orientationchange', this.onResize);
 
     const unsubs = [
       bus.on('playSfx', ({ name }) => this.audio.play(name)),
@@ -256,6 +259,14 @@ export class Game {
     notifyInventoryChange();
   }
 
+  /**
+   * Bound once at construction: event listeners must be removed with the same
+   * reference, and `this.resize` creates a new function on every access.
+   */
+  private readonly onResize = (): void => {
+    this.resize();
+  };
+
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -274,6 +285,27 @@ export class Game {
     this.renderer.setRenderScale(store.graphics.renderScale);
     this.syncSaveRuntime();
   }
+
+  /**
+   * Hidden-tab pause. Unlike the manual pause this one remembers whether the
+   * player paused on purpose: coming back to the tab must resume a game that
+   * was running, and must not yank someone out of their pause menu.
+   */
+  private pauseForHiddenTab(): void {
+    if (this.paused) return;
+    this.pausedByTabHide = true;
+    this.setPaused(true);
+    useGame.getState().setScreen('paused');
+  }
+
+  private resumeFromHiddenTab(): void {
+    if (!this.pausedByTabHide) return;
+    this.pausedByTabHide = false;
+    if (useGame.getState().screen === 'paused') useGame.getState().setScreen('playing');
+    this.setPaused(false);
+  }
+
+  private pausedByTabHide = false;
 
   setPaused(paused: boolean): void {
     this.paused = paused;
@@ -520,6 +552,7 @@ export class Game {
   }
 
   private lastFrameTime = 0;
+  private lastTimePush = -1;
 
   private loop = (): void => {
     if (this.disposed) return;
@@ -642,7 +675,12 @@ export class Game {
       // Crossed midnight.
       store.set({ day: store.day + 1 });
     }
-    store.set({ timeOfDay: this.timeOfDay });
+    // Publishing the clock every frame woke every store subscriber ~60x/s for a
+    // value the HUD renders once a minute. Push it on a small delta instead.
+    if (Math.abs(this.timeOfDay - this.lastTimePush) > 0.02 || this.timeOfDay < this.lastTimePush) {
+      this.lastTimePush = this.timeOfDay;
+      store.set({ timeOfDay: this.timeOfDay });
+    }
     this.sky.update(this.timeOfDay, this.cameraRig.camera.position, this.weatherLevel);
     this.weatherTick(dt);
     this.weather.update(dt, this.cameraRig.camera.position, now / 1000, 0.4, 0.2);
@@ -888,7 +926,9 @@ export class Game {
     if (amount >= 1) this.invulnerableUntil = performance.now() + 700;
     store.damage(amount);
     this.cameraRig.shake(Math.min(0.5, amount * 0.05), 0.4);
-    if (store.health <= 0) this.respawn();
+    // Read the *current* health: `store` is a snapshot taken before damage, so
+    // the player used to sit at 0 HP forever instead of waking by the fire.
+    if (useGame.getState().health <= 0) this.respawn();
   }
 
   private respawn(): void {
@@ -938,13 +978,30 @@ export class Game {
     if (this.lowFpsStreak >= 2 && idx > 0) {
       this.lowFpsStreak = 0;
       const next = order[idx - 1] as 'verylow' | 'low' | 'medium' | 'high';
-      store.setQuality(next);
+      // `setQuality` is the manual (player) path and flips auto off. The engine
+      // has to step down by itself and keep the adaptive controller alive.
+      this.applyAutoQuality(next);
       store.pushToast({ text: t('toast.graphicsLowered', { level: presetLabel(next, getPreset(next).label) }), kind: 'info' });
     } else if (this.highFpsStreak >= 6 && idx < 3 && window.innerWidth > 900) {
       this.highFpsStreak = 0;
       const next = order[idx + 1] as 'verylow' | 'low' | 'medium' | 'high';
-      store.setQuality(next);
+      this.applyAutoQuality(next);
     }
+  }
+
+  /** Engine-side quality change that keeps `graphics.auto` on. */
+  private applyAutoQuality(level: 'verylow' | 'low' | 'medium' | 'high'): void {
+    const store = useGame.getState();
+    const preset = getPreset(level);
+    store.set({
+      graphics: {
+        ...store.graphics,
+        level,
+        renderScale: Math.max(store.graphics.renderScale, preset.minRenderScale),
+      },
+    });
+    this.applyQuality();
+    useGame.getState().setStats({ quality: level });
   }
 
   private pushStats(now: number, frameMs: number): void {
@@ -979,6 +1036,8 @@ export class Game {
     this.beacon.setTarget(target.x, y, target.z);
     this.beacon.update(dt, this.cameraRig.camera.position);
   }
+
+  private readonly guidanceVec = new THREE.Vector3();
 
   /** The tracked objective's world position, if a quest is running. */
   private activeObjective(): { x: number; z: number; label: string } | null {
@@ -1015,7 +1074,8 @@ export class Game {
 
     const camera = this.cameraRig.camera;
     // Anchor on the floating diamond so the on-screen chip sits right under it.
-    const v = new THREE.Vector3(target.x, sampleHeight(target.x, target.z) + 9, target.z);
+    // Reuse one vector: this runs every frame and used to allocate a Vector3.
+    const v = this.guidanceVec.set(target.x, sampleHeight(target.x, target.z) + 9, target.z);
     v.project(camera);
     // Behind the camera: force the pointer to the side it actually belongs on.
     const behind = v.z > 1;
@@ -1157,7 +1217,7 @@ export class Game {
     for (const fn of this.cleanupFns) fn();
     this.cleanupFns = [];
     if (this.visibilityHandler) document.removeEventListener('visibilitychange', this.visibilityHandler);
-    window.removeEventListener('orientationchange', this.resize);
+    window.removeEventListener('orientationchange', this.onResize);
     this.resizeObserver?.disconnect();
     this.input.dispose();
     this.chunks.dispose();

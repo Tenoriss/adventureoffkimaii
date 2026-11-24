@@ -1880,8 +1880,16 @@ input[type='range']::-moz-range-thumb {
 }
 
 @media (max-width: 780px) {
+  /* Phones keep the clock: day/night is a game mechanic, not decoration. The
+     top-centre strip is free once the vitals move to the bottom-left. */
   .clock-slot {
-    display: none;
+    top: calc(10px + var(--safe-top));
+  }
+  .clock-slot .clock-chip {
+    padding: 4px 9px;
+    font-size: 10.5px;
+    gap: 5px;
+    background: rgba(10, 18, 28, 0.62);
   }
   .hud-top-left {
     top: auto;

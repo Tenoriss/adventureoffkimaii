@@ -47,6 +47,12 @@ function GameShell() {
   useEffect(() => {
     if (!game) return;
     const onResume = () => game.setPaused(false);
+    // The pause panel's backdrop was emitting a `resume` bus event that only
+    // setPaused(false), leaving `screen === 'paused'` so the panel stayed up.
+    const onResumeUi = () => {
+      setScreen('playing');
+      game.setPaused(false);
+    };
     const onSave = () => game.saveNow();
     const onPause = () => game.setPaused(true);
     const onQuit = () => {
@@ -56,16 +62,16 @@ function GameShell() {
       setScreen('menu');
     };
     window.addEventListener('lh:resume', onResume);
+    window.addEventListener('lh:resume-ui', onResumeUi);
     window.addEventListener('lh:save', onSave);
     window.addEventListener('lh:pause', onPause);
     window.addEventListener('lh:quit', onQuit);
-    document.addEventListener('visibilitychange', onPause);
     return () => {
       window.removeEventListener('lh:resume', onResume);
+      window.removeEventListener('lh:resume-ui', onResumeUi);
       window.removeEventListener('lh:save', onSave);
       window.removeEventListener('lh:pause', onPause);
       window.removeEventListener('lh:quit', onQuit);
-      document.removeEventListener('visibilitychange', onPause);
     };
   }, [game, set, setScreen]);
 

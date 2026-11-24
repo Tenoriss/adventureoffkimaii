@@ -216,7 +216,9 @@ export function PauseMenu() {
   const resume = () => {
     setScreen('playing');
     bus.emit('resume', undefined);
-    window.dispatchEvent(new CustomEvent('lh:resume'));
+    // Engine-side resume plus the screen flip: emitting only `lh:resume` left
+    // `screen === 'paused'`, so tapping the backdrop did nothing visible.
+    window.dispatchEvent(new CustomEvent('lh:resume-ui'));
     setTab('menu');
   };
 

@@ -54,12 +54,10 @@ function formatClock(hour: number): string {
 
 export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
   const t = useT();
-  const health = useGame((s) => s.health);
-  const maxHealth = useGame((s) => s.maxHealth);
-  const stamina = useGame((s) => s.stamina);
-  const maxStamina = useGame((s) => s.maxStamina);
-  const healthPct = Math.round((health / maxHealth) * 100);
-  const staminaPct = Math.round((stamina / maxStamina) * 100);
+  // Stamina changes every frame while running. Select the rounded percentages
+  // so React bails out unless the bars actually move by a whole percent.
+  const healthPct = useGame((s) => Math.round((s.health / s.maxHealth) * 100));
+  const staminaPct = useGame((s) => Math.round((s.stamina / s.maxStamina) * 100));
 
   return (
     <div className="vitals" style={compact ? { minWidth: 132 } : undefined}>
@@ -68,14 +66,14 @@ export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
         <div className="vital-track" role="progressbar" aria-label={t('hud.health')} aria-valuenow={healthPct} aria-valuemin={0} aria-valuemax={100}>
           <div className="vital-fill health" style={{ width: `${healthPct}%` }} />
         </div>
-        <span className="vital-value">{Math.ceil(health)}</span>
+        <span className="vital-value">{healthPct}</span>
       </div>
       <div className="vital-row">
         <Icon name="bolt" size={13} className="vital-icon stamina" />
         <div className="vital-track" role="progressbar" aria-label={t('hud.stamina')} aria-valuenow={staminaPct} aria-valuemin={0} aria-valuemax={100}>
           <div className={`vital-fill stamina${staminaPct < 25 ? ' low' : ''}`} style={{ width: `${staminaPct}%` }} />
         </div>
-        <span className="vital-value">{Math.ceil(stamina)}</span>
+        <span className="vital-value">{staminaPct}</span>
       </div>
     </div>
   );
@@ -83,14 +81,17 @@ export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
 
 export const ClockChip = memo(function ClockChip() {
   const t = useT();
-  const timeOfDay = useGame((s) => s.timeOfDay);
+  // `timeOfDay` ticks every frame, so subscribe to the coarse value that is
+  // actually rendered. Without this the whole chip tree re-rendered ~60x/s.
+  const totalMinutes = useGame((s) => Math.floor(s.timeOfDay * 60));
   const day = useGame((s) => s.day);
+  const hour = totalMinutes / 60;
   return (
     <div className="clock-chip">
       <span className="sun-icon" aria-hidden>
-        <PhaseIcon phase={phaseOf(timeOfDay)} />
+        <PhaseIcon phase={phaseOf(hour)} />
       </span>
-      <span>{formatClock(timeOfDay)}</span>
+      <span>{formatClock(hour)}</span>
       <span style={{ opacity: 0.4 }}>·</span>
       <span className="day-num">{t('hud.day', { n: day })}</span>
     </div>

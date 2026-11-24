@@ -84,6 +84,12 @@ export class Input {
   private dragLook = { active: false, lastX: 0, lastY: 0, pointerId: -1 };
   private sensitivity = 1;
   private enabled = true;
+  /**
+   * Touch-first devices never see a mouse. Listening for mousedown there made
+   * `requestPointerLock` run on every tap, which is unsupported on iOS/Android
+   * and produced console noise and focus fights with the joystick.
+   */
+  private readonly mouseLook = !(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches);
 
   constructor(element: HTMLElement, handlers: InputHandlers) {
     this.el = element;
@@ -91,9 +97,11 @@ export class Input {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
-    this.el.addEventListener('mousedown', this.onMouseDown);
-    window.addEventListener('mouseup', this.onMouseUp);
-    window.addEventListener('mousemove', this.onMouseMove);
+    if (this.mouseLook) {
+      this.el.addEventListener('mousedown', this.onMouseDown);
+      window.addEventListener('mouseup', this.onMouseUp);
+      window.addEventListener('mousemove', this.onMouseMove);
+    }
     this.el.addEventListener('wheel', this.onWheel, { passive: false });
     this.el.addEventListener('contextmenu', this.onContextMenu);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
@@ -440,9 +448,11 @@ export class Input {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
-    this.el.removeEventListener('mousedown', this.onMouseDown);
-    window.removeEventListener('mouseup', this.onMouseUp);
-    window.removeEventListener('mousemove', this.onMouseMove);
+    if (this.mouseLook) {
+      this.el.removeEventListener('mousedown', this.onMouseDown);
+      window.removeEventListener('mouseup', this.onMouseUp);
+      window.removeEventListener('mousemove', this.onMouseMove);
+    }
     this.el.removeEventListener('wheel', this.onWheel);
     this.el.removeEventListener('contextmenu', this.onContextMenu);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
