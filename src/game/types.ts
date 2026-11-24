@@ -40,6 +40,8 @@ export interface SaveData {
   trackedQuest?: string | null;
   flags: Record<string, boolean | number>;
   seen: string[];
+  /** Harvestable node ids already spent (herbs, caches, shore stones, pickups). */
+  collected?: string[];
   playtime: number;
   updatedAt: number;
 }

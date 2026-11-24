@@ -60,6 +60,8 @@ interface GameState {
   trackedQuest: string | null;
   flags: Record<string, boolean | number>;
   discovered: string[];
+  /** Spent world nodes; never respawn after a reload. */
+  collected: string[];
 
   graphics: GraphicsSettings;
   controls: ControlSettings;
@@ -101,6 +103,8 @@ interface GameState {
   setFlag: (key: string, value: boolean | number) => void;
   getFlag: (key: string) => boolean | number | undefined;
   discover: (name: string) => void;
+  /** Mark a world node as spent (collected) and persist it. */
+  collectNode: (id: string) => void;
 
   setHealth: (v: number) => void;
   damage: (amount: number) => void;
@@ -152,6 +156,7 @@ export const useGame = create<GameState>((set, get) => ({
   trackedQuest: 'q1_first_steps',
   flags: {},
   discovered: [],
+  collected: [],
   graphics: initialGraphics,
   controls: {
     sensitivity: device.isTouch ? 1.15 : 1,
@@ -306,6 +311,12 @@ export const useGame = create<GameState>((set, get) => ({
     bus.emit('areaDiscovered', { name });
   },
 
+  collectNode: (id) => {
+    if (get().collected.includes(id)) return;
+    set((s) => ({ collected: [...s.collected, id] }));
+    bus.emit('requestSave', undefined);
+  },
+
   setHealth: (v) => set({ health: Math.max(0, Math.min(get().maxHealth, v)) }),
   damage: (amount) => {
     const before = get().health;
@@ -348,11 +359,12 @@ export const useGame = create<GameState>((set, get) => ({
       hasSave: true,
       health: save.health,
       stamina: save.stamina,
-      inventory: save.inventory,
+      inventory: (save.inventory ?? []).filter((slot) => !!ITEMS[slot.id]),
       quests: save.quests,
       trackedQuest: tracked,
       flags: save.flags ?? {},
       discovered: save.seen ?? [],
+      collected: save.collected ?? [],
       timeOfDay: save.time,
       started: true,
     });
@@ -371,6 +383,7 @@ export const useGame = create<GameState>((set, get) => ({
       quests: s.quests,
       trackedQuest: s.trackedQuest,
       flags: { ...s.flags, ...saveFlags },
+      collected: s.collected,
       seen: saveSeen,
       playtime: savePlaytime,
       updatedAt: Date.now(),

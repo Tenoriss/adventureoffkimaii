@@ -234,7 +234,8 @@ export class Scenery {
         data: { item: c.item, qty: c.qty },
       });
     }
-    this.place(chestGeo, chestMat, chestEntries, true, shadows);
+    const chestMesh = this.place(chestGeo, chestMat, chestEntries, true, shadows);
+    chestSpots.forEach((c, i) => this.registerNode(`chest:${c.x}:${c.z}`, chestMesh, i, 1));
 
     // Campfires at villages + a wild one.
     const fireGeo = this.geo(buildCampfire());
@@ -305,6 +306,10 @@ export class Scenery {
       });
     }
     this.herbMesh = this.place(herbGeo, herbMat, herbEntries, false, shadows);
+    for (const h of HERBS) {
+      const start = this.herbInstanceIndex.get(h.id);
+      if (start !== undefined) this.registerNode(`herb:${h.id}`, this.herbMesh, start, 3);
+    }
 
     // ---------------- Shore stones (q3: riverstones at Mirror Lake) -------------
     const shoreGeo = this.geo(buildRiverstone());
@@ -325,7 +330,16 @@ export class Scenery {
         data: { itemId: 'riverstone', name: 'Riverstone', qty: 1 },
       });
     }
-    this.place(shoreGeo, shoreMat, stoneEntries, true, shadows);
+    const shoreMesh = this.place(shoreGeo, shoreMat, stoneEntries, true, shadows);
+    {
+      // stoneEntries order matches SHORE_STONES minus the ones under water.
+      let i = 0;
+      for (const spot of SHORE_STONES) {
+        if (sampleHeight(spot.x, spot.z) < WATER_LEVEL + 0.05) continue;
+        this.registerNode(`stone:${spot.id}`, shoreMesh, i, 1);
+        i++;
+      }
+    }
 
     // The lost lure glints among the stones of the northern lake shore. It is
     // picked up automatically on approach (Game.checkShorePickups) so there is
@@ -370,7 +384,13 @@ export class Scenery {
         }
         count++;
       }
-      this.place(capGeo, capMat, caps, false, shadows);
+      const capMesh = this.place(capGeo, capMat, caps, false, shadows);
+      // caps[] holds every mushroom; the interactable only sits on every 4th.
+      for (const item of interactables) {
+        if (!item.id.startsWith('cap:')) continue;
+        const idx = caps.findIndex((c) => Math.abs(c.x - item.x) < 0.01 && Math.abs(c.z - item.z) < 0.01);
+        if (idx >= 0) this.registerNode(item.id, capMesh, idx, 1);
+      }
     }
 
     // ---------------- Powerups ----------------
@@ -443,6 +463,15 @@ export class Scenery {
   private herbMesh: THREE.InstancedMesh | null = null;
   private lureMesh: THREE.InstancedMesh | null = null;
   private herbInstanceIndex = new Map<string, number>();
+  /** Every harvestable node: its instanced mesh, first instance index, span. */
+  private nodeInstances = new Map<string, { mesh: THREE.InstancedMesh; start: number; count: number }>();
+  /** Ids whose node has already been spent (kept so a reload can hide it). */
+  private spent = new Set<string>();
+
+  private registerNode(id: string, mesh: THREE.InstancedMesh | null, start: number, count: number): void {
+    if (!mesh) return;
+    this.nodeInstances.set(id, { mesh, start, count });
+  }
   private pickupGroup: THREE.Group | null = null;
   private pickupMeshes: { mesh: THREE.Mesh; kind: PowerupKind; baseY: number; phase: number }[] = [];
 
@@ -514,6 +543,39 @@ export class Scenery {
     this.lureMesh = null;
   }
 
+  /**
+   * Hide a spent harvestable for good. Instanced meshes cannot drop a single
+   * draw item, so the instance is scaled to zero; the id is remembered so the
+   * same node stays gone after a reload.
+   */
+  hideNode(id: string): void {
+    this.spent.add(id);
+    this.applyHidden(id);
+  }
+
+  /** True when this node was already collected in a previous session. */
+  isSpent(id: string): boolean {
+    return this.spent.has(id);
+  }
+
+  /** Re-apply every known spent node (called once after a save is loaded). */
+  restoreSpent(ids: Iterable<string>): void {
+    for (const id of ids) {
+      this.spent.add(id);
+      this.applyHidden(id);
+    }
+  }
+
+  private applyHidden(id: string): void {
+    const entry = this.nodeInstances.get(id);
+    if (!entry) return;
+    const m = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = entry.start; i < entry.start + entry.count && i < entry.mesh.count; i++) {
+      entry.mesh.setMatrixAt(i, m);
+    }
+    entry.mesh.instanceMatrix.needsUpdate = true;
+  }
+
   hidePickup(id: string): void {
     const idx = POWERUP_SPOTS.findIndex((s) => s.id === id);
     if (idx < 0) return;
@@ -534,6 +596,7 @@ export class Scenery {
     this.geometries = [];
     this.pickupMeshes = [];
     this.herbInstanceIndex.clear();
+    this.nodeInstances.clear();
     this.herbMesh = null;
     this.lureMesh = null;
   }

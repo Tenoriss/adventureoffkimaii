@@ -1,4 +1,4 @@
-import type { AudioSettings, ControlSettings, GraphicsSettings, SaveData } from './types';
+import type { AudioSettings, ControlSettings, GraphicsSettings, QuestState, SaveData } from './types';
 import { SAVE_KEY, SETTINGS_KEY, SAVE_VERSION, saveSeen, savePlaytime, saveFlags } from './saveRuntime';
 import { POWER_UPS } from './powerups';
 
@@ -20,12 +20,51 @@ function safeParse<T>(raw: string | null): T | null {
 export function readSave(): SaveData | null {
   try {
     const data = safeParse<SaveData>(localStorage.getItem(SAVE_KEY));
-    if (!data) return null;
-    if (data.version !== SAVE_VERSION) return migrate(data);
-    return data;
+    if (!data || typeof data !== 'object') return null;
+    const migrated = data.version !== SAVE_VERSION ? migrate(data) : data;
+    if (!migrated) return null;
+    // A half-written or hand-edited save used to reach the store with missing
+    // arrays and crash `Object.keys(save.quests)` on the Continue button.
+    return sanitize(migrated);
   } catch {
     return null;
   }
+}
+
+/** Coerce every field to the shape the rest of the game assumes. */
+function sanitize(data: SaveData): SaveData | null {
+  const p = data.player;
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return null;
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  const inventory = Array.isArray(data.inventory)
+    ? data.inventory
+        .filter((s) => s && typeof s.id === 'string' && Number.isFinite(s.qty) && s.qty > 0)
+        .map((s) => ({ id: s.id, qty: Math.min(99, Math.floor(s.qty)) }))
+    : [];
+  const quests: Record<string, QuestState> = {};
+  if (data.quests && typeof data.quests === 'object') {
+    for (const [id, q] of Object.entries(data.quests)) {
+      if (!q || typeof q !== 'object') continue;
+      const status = q.status;
+      if (status !== 'active' && status !== 'complete' && status !== 'available' && status !== 'locked') continue;
+      quests[id] = { status, progress: Math.max(0, Math.floor(num(q.progress, 0))) };
+    }
+  }
+  const maxHealth = 100;
+  return {
+    ...data,
+    player: { x: p.x, y: num(p.y, 0), z: p.z, yaw: num(p.yaw, 0) },
+    time: Math.min(24, Math.max(0, num(data.time, 8))),
+    health: Math.min(maxHealth, Math.max(1, num(data.health, maxHealth))),
+    stamina: Math.min(100, Math.max(0, num(data.stamina, 100))),
+    inventory,
+    quests,
+    flags: data.flags && typeof data.flags === 'object' ? data.flags : {},
+    seen: Array.isArray(data.seen) ? data.seen.filter((x) => typeof x === 'string') : [],
+    collected: Array.isArray(data.collected) ? data.collected.filter((x) => typeof x === 'string') : [],
+    playtime: Math.max(0, num(data.playtime, 0)),
+    updatedAt: num(data.updatedAt, Date.now()),
+  };
 }
 
 function migrate(data: SaveData): SaveData | null {

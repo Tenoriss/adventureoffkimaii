@@ -176,6 +176,17 @@ export class Game {
       this.player.yaw = saved.player.yaw;
       this.timeOfDay = saved.time;
     }
+    // Replay everything already collected in this save so spent herbs, caches,
+    // shore stones and pickups do not reappear after a reload.
+    const collected = useGame.getState().collected;
+    this.scenery.restoreSpent(collected);
+    if (collected.length > 0) {
+      const spent = new Set(collected);
+      this.interactables = this.interactables.filter((i) => !spent.has(i.id));
+    }
+    if (useGame.getState().flags['lure_collected']) this.lureTaken = true;
+    if (collected.includes('lure:shore')) this.lureTaken = true;
+
     this.dialogue = new DialogueController(() => this.onDialogueChanged());
     this.chunks.update(this.player.position.x, this.player.position.z);
     this.chunks.processQueue(60);
@@ -397,8 +408,7 @@ export class Game {
         if (store.addItem(itemId, 1)) {
           store.pushToast({ text: t('toast.herbCollected', { name: placeName(def?.name ?? 'Sunleaf') }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.6, target.z), 0xa8f0a0, { count: 14, speed: 1.6 });
-          const herbId = String(target.id).split(':')[1];
-          this.scenery.hideHerb(herbId);
+          this.spendNode(target.id);
           this.audio.play('pickup');
           this.removeInteractable(target.id);
         } else {
@@ -414,6 +424,7 @@ export class Game {
           store.pushToast({ text: t('toast.stoneCollected', { name: placeName(def?.name ?? 'Riverstone') }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.4, target.z), 0xbfe6f2, { count: 12, speed: 1.4 });
           this.audio.play('pickup');
+          this.spendNode(target.id);
           this.removeInteractable(target.id);
         }
         break;
@@ -426,6 +437,7 @@ export class Game {
           store.pushToast({ text: t('toast.itemQty', { name: placeName(def?.name ?? 'Item'), qty }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.8, target.z), 0xffd479, { count: 26, speed: 3 });
           this.audio.play('pickup');
+          this.spendNode(target.id);
           this.removeInteractable(target.id);
         }
         break;
@@ -513,6 +525,16 @@ export class Game {
       default:
         break;
     }
+  }
+
+  /**
+   * A harvested node must stay gone: hide it now and remember it in the save,
+   * otherwise every reload respawned the herb and the player could duplicate
+   * items indefinitely.
+   */
+  private spendNode(id: string): void {
+    this.scenery.hideNode(id);
+    useGame.getState().collectNode(id);
   }
 
   private removeInteractable(id: string): void {
@@ -758,6 +780,7 @@ export class Game {
       if (inQuest && d < LURE.radius) {
         this.lureTaken = true;
         this.scenery.hideLure();
+        useGame.getState().collectNode('lure:shore');
         store.addItem('fishermans_lure', 1);
         store.pushToast({ text: t('toast.lureRecovered'), kind: 'item', icon: 'fishermans_lure' });
         // Picking the lure up satisfies the first objective (find it).
@@ -885,6 +908,7 @@ export class Game {
         const kind = item.data.kind as PowerupKind;
         this.applyPowerup(kind);
         this.scenery.hidePickup(String(item.data.pickup));
+        useGame.getState().collectNode(item.id);
         this.particles.spawn(new THREE.Vector3(item.x, item.y + 1, item.z), POWER_UPS[kind].color, {
           count: 18,
           speed: 2.2,
@@ -1148,14 +1172,17 @@ export class Game {
       case 'q3_bright_water':
         if (progress === 0) return { x: -210, z: 190, label: placeName('Mirror Lake') };
         if (progress === 1) {
-          // Point at the closest shore stone the player has not picked up.
+          // Point at the closest shore stone that is still there: pointing the
+          // beacon at one the player already pocketed sends them to nothing.
+          const collected = new Set(store.collected);
           let best = SHORE_STONES[0];
           let bestD = Infinity;
-          for (const s of SHORE_STONES) {
-            const d = Math.hypot(s.x - this.player.position.x, s.z - this.player.position.z);
+          for (const stone of SHORE_STONES) {
+            if (collected.has(`stone:${stone.id}`)) continue;
+            const d = Math.hypot(stone.x - this.player.position.x, stone.z - this.player.position.z);
             if (d < bestD) {
               bestD = d;
-              best = s;
+              best = stone;
             }
           }
           return { x: best.x, z: best.z, label: t('obj.riverstones') };

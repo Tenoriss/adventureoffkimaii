@@ -50,6 +50,9 @@ export function MainMenu() {
       quests: {},
       flags: {},
       discovered: [],
+      // Forgetting this would keep every herb, cache and stone invisible in a
+      // brand new world.
+      collected: [],
       health: 100,
       stamina: 100,
       timeOfDay: 8.4,
