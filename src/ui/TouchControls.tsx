@@ -3,12 +3,14 @@ import { useGame } from '../game/store';
 import { useEngine } from './useGameEngine';
 import { bus } from '../game/bus';
 import { Icon } from './Icon';
+import { useT } from '../i18n';
 
 /**
  * Virtual joystick + camera swipe + action buttons.
  * All handlers write into `game.input.touch`, which the engine reads each frame.
  */
 export function TouchControls() {
+  const t = useT();
   const { game } = useEngine();
   const isTouch = useGame((s) => s.isTouch);
   const joystickSide = useGame((s) => s.controls.joystickSide);
@@ -227,7 +229,7 @@ export function TouchControls() {
             style={{ color: sprintLatched ? '#ffe6b8' : undefined }}
           >
             <Icon name="sprint" size={20} />
-            <span className="btn-label">Sprint</span>
+            <span className="btn-label">{t('hud.touchSprint')}</span>
           </button>
         </div>
         <div className="touch-btn-wrap">
@@ -240,10 +242,10 @@ export function TouchControls() {
             }}
             onPointerUp={() => setPressed(null)}
             onPointerCancel={() => setPressed(null)}
-            aria-label="Jump"
+            aria-label={t('hud.touchJump')}
           >
             <Icon name="jump" size={26} />
-            <span className="btn-label">Jump</span>
+            <span className="btn-label">{t('hud.touchJump')}</span>
           </button>
         </div>
       </div>
@@ -258,13 +260,13 @@ export function TouchControls() {
       )}
 
       <div className="touch-top-row">
-        <button className="touch-menu-btn" onPointerDown={openQuests} aria-label="Quest log">
+        <button className="touch-menu-btn" onPointerDown={openQuests} aria-label={t('journal.title')}>
           <Icon name="journal" />
         </button>
-        <button className="touch-menu-btn" onPointerDown={openInventory} aria-label="Inventory">
+        <button className="touch-menu-btn" onPointerDown={openInventory} aria-label={t('inv.title')}>
           <Icon name="satchel" />
         </button>
-        <button className="touch-menu-btn" onPointerDown={pause} aria-label="Pause menu">
+        <button className="touch-menu-btn" onPointerDown={pause} aria-label={t('pause.title')}>
           <Icon name="pause" />
         </button>
       </div>

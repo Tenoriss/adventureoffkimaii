@@ -3,12 +3,15 @@ import { useGame } from '../game/store';
 import { useEngine } from './useGameEngine';
 import { bus } from '../game/bus';
 import { Icon } from './Icon';
+import { useT } from '../i18n';
+import { placeName } from '../i18n/content';
 
 /**
  * Full-screen parchment-style world map. The base image is baked once from the
  * heightfield (cheap, ~250ms on mobile) and markers are drawn on top.
  */
 export function WorldMap() {
+  const t = useT();
   const open = useGame((s) => s.mapOpen);
   const set = useGame((s) => s.set);
   const { game } = useEngine();
@@ -72,7 +75,7 @@ export function WorldMap() {
         ctx.textAlign = 'center';
         ctx.shadowColor = 'rgba(0,0,0,0.85)';
         ctx.shadowBlur = 4;
-        ctx.fillText(v.name, x, y - 10);
+        ctx.fillText(placeName(v.name), x, y - 10);
         ctx.shadowBlur = 0;
       }
 
@@ -144,13 +147,13 @@ export function WorldMap() {
 
   return (
     <div className="panel-backdrop" onClick={close} role="presentation">
-      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="World map">
+      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('map.title')}>
         <div className="panel-head">
           <div>
-            <h2>Lost Horizon</h2>
-            <div className="sub">The Emberfall Valley and beyond</div>
+            <h2>{t('map.title')}</h2>
+            <div className="sub">{t('map.sub')}</div>
           </div>
-          <button className="icon-btn" onClick={close} aria-label="Close map">
+          <button className="icon-btn" onClick={close} aria-label={t('map.title')}>
             <Icon name="close" size={16} />
           </button>
         </div>
@@ -158,26 +161,26 @@ export function WorldMap() {
           <div className="map-canvas-wrap">
             <canvas ref={canvasRef} />
           </div>
-          <div className="map-legend">
+          <div className="map-legend" aria-label={t('map.legend')}>
             <span>
               <span className="legend-dot" style={{ background: '#f0c07a' }} />
-              Villages
+              {t('map.villages')}
             </span>
             <span>
               <span className="legend-dot" style={{ background: '#8fe3ff' }} />
-              Waystones
+              {t('map.waystones')}
             </span>
             <span>
               <span className="legend-dot" style={{ background: '#c9a0ff' }} />
-              Echo Hollow
+              {t('map.cave')}
             </span>
             <span>
               <span className="legend-dot" style={{ background: '#ffd894' }} />
-              Objective
+              {t('map.objective')}
             </span>
             <span>
               <span className="legend-dot" style={{ background: '#ffffff' }} />
-              You
+              {t('map.you')}
             </span>
           </div>
         </div>

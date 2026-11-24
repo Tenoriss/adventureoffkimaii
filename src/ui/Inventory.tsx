@@ -5,8 +5,11 @@ import { useEngine } from './useGameEngine';
 import { bus } from '../game/bus';
 import { Icon } from './Icon';
 import { ItemIcon } from './ItemIcon';
+import { useT } from '../i18n';
+import { itemName, itemDescription, itemRarity } from '../i18n/content';
 
 export function Inventory() {
+  const t = useT();
   const open = useGame((s) => s.inventoryOpen);
   const inventory = useGame((s) => s.inventory);
   const set = useGame((s) => s.set);
@@ -37,30 +40,34 @@ export function Inventory() {
       bus.emit('playSfx', { name: 'heal' });
       if (useGame.getState().countItem(selected) === 0) setSelected(null);
     } else {
-      useGame.getState().pushToast({ text: 'That cannot be used right now.', kind: 'info' });
+      useGame.getState().pushToast({ text: t('inv.cannotUse'), kind: 'info' });
     }
   };
 
   return (
     <div className="panel-backdrop" onClick={close} role="presentation">
-      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Inventory">
+      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('inv.title')}>
         <div className="panel-head">
           <div>
-            <h2>Satchel</h2>
+            <h2>{t('inv.title')}</h2>
             <div className="sub">
-              {inventory.reduce((n, s) => n + s.qty, 0)} items · {inventory.length}/{INVENTORY_SIZE} slots
+              {t('inv.sub', {
+                items: inventory.reduce((n, s) => n + s.qty, 0),
+                used: inventory.length,
+                size: INVENTORY_SIZE,
+              })}
             </div>
           </div>
-          <button className="icon-btn" onClick={close} aria-label="Close inventory">
+          <button className="icon-btn" onClick={close} aria-label={t('inv.title')}>
             <Icon name="close" size={16} />
           </button>
         </div>
         <div className="panel-body">
           {inventory.length === 0 && (
             <div className="empty-note">
-              Your satchel is empty.
+              {t('inv.empty')}
               <br />
-              Gather sunleaf in the meadows or open a cache to fill it.
+              {t('inv.emptyHint')}
             </div>
           )}
           <div className="inv-grid">
@@ -77,7 +84,7 @@ export function Inventory() {
                     setSelected(slot.id);
                     bus.emit('playSfx', { name: 'ui' });
                   }}
-                  aria-label={`${def?.name ?? slot.id}, ${slot.qty}`}
+                  aria-label={`${itemName(slot.id, def?.name ?? slot.id)}, ${slot.qty}`}
                 >
                   <ItemIcon id={slot.id} size={30} />
                   {def && def.rarity !== 'common' && <span className={`inv-rare ${def.rarity}`} />}
@@ -94,13 +101,13 @@ export function Inventory() {
                   <ItemIcon id={selectedDef.id} size={40} />
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <h3>{selectedDef.name}</h3>
-                  <p>{selectedDef.description}</p>
-                  <span className="tag">{selectedDef.rarity}</span>
+                  <h3>{itemName(selectedDef.id, selectedDef.name)}</h3>
+                  <p>{itemDescription(selectedDef.id, selectedDef.description)}</p>
+                  <span className="tag">{itemRarity(selectedDef.id, selectedDef.rarity)}</span>
                   {(selected === 'trail_ration' || selected === 'sunleaf') && (
                     <div style={{ marginTop: 10 }}>
                       <button className="btn primary" onClick={useItem} style={{ minHeight: 38, padding: '8px 16px' }}>
-                        Use item
+                        {t('inv.use')}
                       </button>
                     </div>
                   )}
@@ -108,7 +115,7 @@ export function Inventory() {
               </>
             ) : (
               <div style={{ color: 'var(--ink-faint)', fontSize: 12.5, alignSelf: 'center' }}>
-                Select an item to inspect it.
+                {t('inv.select')}
               </div>
             )}
           </div>

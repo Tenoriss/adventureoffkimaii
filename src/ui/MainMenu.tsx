@@ -5,30 +5,35 @@ import { readSave, clearSave } from '../game/save';
 import { SettingsPanel } from './SettingsPanel';
 import { bus } from '../game/bus';
 import { Icon } from './Icon';
+import { useT, useLang, setLang, LANGUAGES } from '../i18n';
+import { presetLabel } from '../i18n/content';
+import type { TKey } from '../i18n/ui';
 
-const TIPS = [
-  'Sprint drains stamina — let it refill on flat ground before you climb.',
-  'Time only passes while you play. Rest at a campfire to skip ahead.',
-  'The compass at the top of your HUD points at your tracked objective.',
-  'Waystones mark the land. Touch one to wake it.',
-  'Caches in the wild hold rations, embercaps and riverstones.',
-  'Deep water drains stamina. Do not swim when you are exhausted.',
-  'Every device gets its own graphics preset — change it any time in Settings.',
+const TIP_KEYS: TKey[] = [
+  'menu.tip1',
+  'menu.tip2',
+  'menu.tip3',
+  'menu.tip4',
+  'menu.tip5',
+  'menu.tip6',
+  'menu.tip7',
 ];
 
 export function MainMenu() {
+  const t = useT();
   const hasSave = useGame((s) => s.hasSave);
   const stats = useGame((s) => s.stats);
   const setScreen = useGame((s) => s.setScreen);
   const set = useGame((s) => s.set);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLanguage, setShowLanguage] = useState(false);
   const [tip, setTip] = useState(0);
   const device = useMemo(() => detectDevice(), []);
   const quality = useGame((s) => s.graphics.level);
   const preset = getPreset(quality);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTip((t) => (t + 1) % TIPS.length), 7000);
+    const id = window.setInterval(() => setTip((n) => (n + 1) % TIP_KEYS.length), 7000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -60,27 +65,27 @@ export function MainMenu() {
     set({ started: true });
   };
 
-  const deviceLabel = device.isMobile ? 'Phone' : device.isTablet ? 'Tablet' : 'Desktop';
+  const deviceLabel = device.isMobile
+    ? t('menu.device.phone')
+    : device.isTablet
+      ? t('menu.device.tablet')
+      : t('menu.device.desktop');
   const gpuLabel = tidyGpu(device.gpu);
 
   return (
     <div className="menu-screen">
       <div className="menu-inner">
         <div className="title-block">
-          <div className="title-eyebrow">An open world in your browser</div>
+          <div className="title-eyebrow">{t('menu.eyebrow')}</div>
           <h1 className="game-title">LOST HORIZON</h1>
           <div className="title-rule" />
-          <p className="title-sub">
-            A quiet valley, three sleeping waystones, and a horizon that has been lost for forty years.
-          </p>
+          <p className="title-sub">{t('menu.subtitle')}</p>
         </div>
 
         <div className="device-badge">
           <span>{deviceLabel}</span>
           <span style={{ opacity: 0.35 }}>·</span>
-          <span>
-            <strong>{preset.label}</strong> graphics
-          </span>
+          <span>{t('menu.preset', { level: presetLabel(preset.level, preset.label) })}</span>
           {device.gpu !== 'unknown' && (
             <>
               <span style={{ opacity: 0.35 }}>·</span>
@@ -94,39 +99,91 @@ export function MainMenu() {
         <div className="menu-actions">
           {hasSave && (
             <button className="menu-btn main" onClick={continueGame}>
-              Continue
-              <span className="sub">Pick up where you left off</span>
+              {t('menu.continue')}
+              <span className="sub">{t('menu.continueSub')}</span>
             </button>
           )}
           <button className={`menu-btn${hasSave ? '' : ' main'}`} onClick={startNew}>
-            {hasSave ? 'New journey' : 'Begin the journey'}
-            <span className="sub">{hasSave ? 'Reset the world and start over' : 'Start in the village of Emberfall'}</span>
+            {hasSave ? t('menu.new') : t('menu.newMain')}
+            <span className="sub">{hasSave ? t('menu.newSub') : t('menu.newMainSub')}</span>
           </button>
           <button className="menu-btn" onClick={() => setShowSettings(true)}>
-            Settings
-            <span className="sub">Graphics, controls and audio</span>
+            {t('menu.settings')}
+            <span className="sub">{t('menu.settingsSub')}</span>
+          </button>
+          <button className="menu-btn" onClick={() => setShowLanguage(true)}>
+            {t('menu.language')}
+            <span className="sub">{t('menu.languageSub')}</span>
           </button>
         </div>
 
         <div className="menu-foot">
-          <div>{TIPS[tip]}</div>
+          <div>{t(TIP_KEYS[tip])}</div>
           <div style={{ marginTop: 10 }}>
-            {device.isTouch ? 'Touch controls enabled' : 'WASD · Mouse · Shift · Space · E · ESC'} · {stats.quality} preset
+            {device.isTouch ? t('menu.touchOn') : t('menu.keysHint')} ·{' '}
+            {t('menu.preset', { level: presetLabel(stats.quality, getPreset(stats.quality).label) })}
           </div>
         </div>
       </div>
 
       {showSettings && (
         <div className="panel-backdrop" onClick={() => setShowSettings(false)} role="presentation">
-          <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
+          <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('set.title')}>
             <div className="panel-head">
-              <h2>Settings</h2>
-              <button className="icon-btn" onClick={() => setShowSettings(false)} aria-label="Close settings">
+              <h2>{t('set.title')}</h2>
+              <button className="icon-btn" onClick={() => setShowSettings(false)} aria-label={t('set.title')}>
                 ✕
               </button>
             </div>
             <SettingsPanel onClose={() => setShowSettings(false)} embedded />
           </div>
+        </div>
+      )}
+
+      {showLanguage && (
+        <div className="panel-backdrop" onClick={() => setShowLanguage(false)} role="presentation">
+          <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('menu.language')}>
+            <div className="panel-head">
+              <h2>{t('menu.language')}</h2>
+              <button className="icon-btn" onClick={() => setShowLanguage(false)} aria-label={t('menu.language')}>
+                ✕
+              </button>
+            </div>
+            <div className="panel-body">
+              <LanguagePicker />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Two large, obvious language buttons (also used inside Settings). */
+export function LanguagePicker({ compact = false }: { compact?: boolean }) {
+  const t = useT();
+  const lang = useLang();
+  return (
+    <div>
+      <div className="pill-row" role="radiogroup" aria-label={t('set.language')}>
+        {LANGUAGES.map((l) => (
+          <button
+            key={l.id}
+            role="radio"
+            aria-checked={lang === l.id}
+            className={`pill${lang === l.id ? ' active' : ''}`}
+            onClick={() => {
+              setLang(l.id);
+              bus.emit('playSfx', { name: 'ui' });
+            }}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
+      {!compact && (
+        <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 8, lineHeight: 1.5 }}>
+          {t('set.languageHint')}
         </div>
       )}
     </div>
@@ -144,6 +201,7 @@ function tidyGpu(raw: string): string {
 }
 
 export function PauseMenu() {
+  const t = useT();
   const screen = useGame((s) => s.screen);
   const setScreen = useGame((s) => s.setScreen);
   const health = useGame((s) => s.health);
@@ -172,17 +230,17 @@ export function PauseMenu() {
         className="panel"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Paused"
+        aria-label={t('pause.title')}
         style={{ width: 'min(640px, 100%)' }}
       >
         <div className="panel-head">
           <div>
-            <h2>Paused</h2>
+            <h2>{t('pause.title')}</h2>
             <div className="sub">
-              {active} active quest{active === 1 ? '' : 's'} · {completed} complete · {items} items · {discovered.length} places
+              {t('pause.summary', { active, done: completed, items, places: discovered.length })}
             </div>
           </div>
-          <button className="icon-btn" onClick={resume} aria-label="Resume">
+          <button className="icon-btn" onClick={resume} aria-label={t('pause.resume')}>
             <Icon name="play" size={16} />
           </button>
         </div>
@@ -191,8 +249,8 @@ export function PauseMenu() {
             <>
               <div className="pause-grid">
                 <button className="pause-tile" onClick={resume}>
-                  <span className="title">Resume</span>
-                  <span className="sub">Back to the world</span>
+                  <span className="title">{t('pause.resume')}</span>
+                  <span className="sub">{t('pause.resumeSub')}</span>
                 </button>
                 <button
                   className="pause-tile"
@@ -200,8 +258,8 @@ export function PauseMenu() {
                     set({ inventoryOpen: true, questLogOpen: false });
                   }}
                 >
-                  <span className="title">Satchel</span>
-                  <span className="sub">{items} items</span>
+                  <span className="title">{t('pause.satchel')}</span>
+                  <span className="sub">{t('pause.items', { n: items })}</span>
                 </button>
                 <button
                   className="pause-tile"
@@ -209,28 +267,26 @@ export function PauseMenu() {
                     set({ questLogOpen: true, inventoryOpen: false });
                   }}
                 >
-                  <span className="title">Journal</span>
-                  <span className="sub">
-                    {active} active / {completed} done
-                  </span>
+                  <span className="title">{t('pause.journal')}</span>
+                  <span className="sub">{t('pause.journalSub', { active, done: completed })}</span>
                 </button>
                 <button className="pause-tile" onClick={() => setTab('settings')}>
-                  <span className="title">Settings</span>
-                  <span className="sub">Graphics and audio</span>
+                  <span className="title">{t('pause.settings')}</span>
+                  <span className="sub">{t('pause.settingsSub')}</span>
                 </button>
                 <button className="pause-tile" onClick={() => setTab('controls')}>
-                  <span className="title">Controls</span>
-                  <span className="sub">Keyboard and touch</span>
+                  <span className="title">{t('pause.controls')}</span>
+                  <span className="sub">{t('pause.controlsSub')}</span>
                 </button>
                 <button
                   className="pause-tile"
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('lh:save'));
-                    useGame.getState().pushToast({ text: 'Progress saved', kind: 'info' });
+                    useGame.getState().pushToast({ text: t('pause.savedToast'), kind: 'info' });
                   }}
                 >
-                  <span className="title">Save now</span>
-                  <span className="sub">Autosaves too</span>
+                  <span className="title">{t('pause.save')}</span>
+                  <span className="sub">{t('pause.saveSub')}</span>
                 </button>
               </div>
               <div style={{ marginTop: 4 }}>
@@ -240,11 +296,11 @@ export function PauseMenu() {
                     window.dispatchEvent(new CustomEvent('lh:quit'));
                   }}
                 >
-                  Save and return to title
+                  {t('pause.quit')}
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
-                Health {Math.round(health)} · progress autosaves every 20 seconds and when the tab closes.
+                {t('pause.footer', { health: Math.round(health) })}
               </div>
             </>
           )}
@@ -257,14 +313,15 @@ export function PauseMenu() {
 }
 
 function ControlsHelp({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const isTouch = useGame((s) => s.isTouch);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div className="section-label">Keyboard and mouse</div>
+        <div className="section-label">{t('controls.kbm')}</div>
         <div className="controls-grid">
           <div className="control-row">
-            <span>Move</span>
+            <span>{t('controls.move')}</span>
             <span className="control-keys">
               <span className="key-cap">W</span>
               <span className="key-cap">A</span>
@@ -273,61 +330,61 @@ function ControlsHelp({ onBack }: { onBack: () => void }) {
             </span>
           </div>
           <div className="control-row">
-            <span>Camera</span>
+            <span>{t('controls.camera')}</span>
             <span className="control-keys">
               <span className="key-cap">Mouse</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Sprint</span>
+            <span>{t('controls.sprint')}</span>
             <span className="control-keys">
               <span className="key-cap">Shift</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Jump</span>
+            <span>{t('controls.jump')}</span>
             <span className="control-keys">
               <span className="key-cap">Space</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Interact</span>
+            <span>{t('controls.interact')}</span>
             <span className="control-keys">
               <span className="key-cap">E</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Satchel</span>
+            <span>{t('controls.satchel')}</span>
             <span className="control-keys">
               <span className="key-cap">I</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Journal</span>
+            <span>{t('controls.journal')}</span>
             <span className="control-keys">
               <span className="key-cap">J</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Map</span>
+            <span>{t('controls.map')}</span>
             <span className="control-keys">
               <span className="key-cap">M</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Eat / heal</span>
+            <span>{t('controls.eat')}</span>
             <span className="control-keys">
               <span className="key-cap">H</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Reset camera</span>
+            <span>{t('controls.resetCam')}</span>
             <span className="control-keys">
               <span className="key-cap">R</span>
             </span>
           </div>
           <div className="control-row">
-            <span>Pause</span>
+            <span>{t('controls.pause')}</span>
             <span className="control-keys">
               <span className="key-cap">Esc</span>
             </span>
@@ -336,40 +393,37 @@ function ControlsHelp({ onBack }: { onBack: () => void }) {
       </div>
       {isTouch && (
         <div>
-          <div className="section-label">Touch</div>
+          <div className="section-label">{t('controls.touch')}</div>
           <div className="controls-grid">
             <div className="control-row">
-              <span>Move</span>
-              <span className="key-cap touch">Left stick</span>
+              <span>{t('controls.move')}</span>
+              <span className="key-cap touch">{t('controls.leftStick')}</span>
             </div>
             <div className="control-row">
-              <span>Look around</span>
-              <span className="key-cap touch">Swipe</span>
+              <span>{t('controls.look')}</span>
+              <span className="key-cap touch">{t('controls.swipe')}</span>
             </div>
             <div className="control-row">
-              <span>Jump</span>
+              <span>{t('controls.jump')}</span>
               <span className="key-cap touch">⤒</span>
             </div>
             <div className="control-row">
-              <span>Sprint</span>
+              <span>{t('controls.sprint')}</span>
               <span className="key-cap touch">»</span>
             </div>
             <div className="control-row">
-              <span>Interact</span>
+              <span>{t('controls.interact')}</span>
               <span className="key-cap touch">✋</span>
             </div>
           </div>
         </div>
       )}
       <div>
-        <div className="section-label">Controller</div>
-        <div style={{ fontSize: 12, color: 'var(--ink-dim)', lineHeight: 1.7 }}>
-          Gamepads work out of the box: left stick to move, right stick for the camera, A to jump, X to interact, Y for
-          the satchel, LB to sprint, Start to pause.
-        </div>
+        <div className="section-label">{t('controls.gamepad')}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-dim)', lineHeight: 1.7 }}>{t('controls.gamepadBody')}</div>
       </div>
       <button className="btn ghost" onClick={onBack} style={{ alignSelf: 'flex-start' }}>
-        Back
+        {t('controls.back')}
       </button>
     </div>
   );

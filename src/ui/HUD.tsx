@@ -6,6 +6,8 @@ import { useEngine } from './useGameEngine';
 import { Icon } from './Icon';
 import { ItemIcon } from './ItemIcon';
 import { ITEMS } from '../config/items';
+import { useT } from '../i18n';
+import { questTitle, objectiveText, placeName } from '../i18n/content';
 
 type Phase = 'night' | 'dawn' | 'day' | 'dusk';
 
@@ -51,6 +53,7 @@ function formatClock(hour: number): string {
 }
 
 export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
+  const t = useT();
   const health = useGame((s) => s.health);
   const maxHealth = useGame((s) => s.maxHealth);
   const stamina = useGame((s) => s.stamina);
@@ -62,14 +65,14 @@ export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
     <div className="vitals" style={compact ? { minWidth: 132 } : undefined}>
       <div className="vital-row">
         <Icon name="heart" size={13} className="vital-icon health" />
-        <div className="vital-track" role="progressbar" aria-label="Health" aria-valuenow={healthPct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="vital-track" role="progressbar" aria-label={t('hud.health')} aria-valuenow={healthPct} aria-valuemin={0} aria-valuemax={100}>
           <div className="vital-fill health" style={{ width: `${healthPct}%` }} />
         </div>
         <span className="vital-value">{Math.ceil(health)}</span>
       </div>
       <div className="vital-row">
         <Icon name="bolt" size={13} className="vital-icon stamina" />
-        <div className="vital-track" role="progressbar" aria-label="Stamina" aria-valuenow={staminaPct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="vital-track" role="progressbar" aria-label={t('hud.stamina')} aria-valuenow={staminaPct} aria-valuemin={0} aria-valuemax={100}>
           <div className={`vital-fill stamina${staminaPct < 25 ? ' low' : ''}`} style={{ width: `${staminaPct}%` }} />
         </div>
         <span className="vital-value">{Math.ceil(stamina)}</span>
@@ -79,6 +82,7 @@ export const Vitals = memo(function Vitals({ compact }: { compact: boolean }) {
 });
 
 export const ClockChip = memo(function ClockChip() {
+  const t = useT();
   const timeOfDay = useGame((s) => s.timeOfDay);
   const day = useGame((s) => s.day);
   return (
@@ -88,12 +92,13 @@ export const ClockChip = memo(function ClockChip() {
       </span>
       <span>{formatClock(timeOfDay)}</span>
       <span style={{ opacity: 0.4 }}>·</span>
-      <span className="day-num">Day {day}</span>
+      <span className="day-num">{t('hud.day', { n: day })}</span>
     </div>
   );
 });
 
 export const ObjectivePill = memo(function ObjectivePill({ hidden = false }: { hidden?: boolean }) {
+  const t = useT();
   const trackedQuest = useGame((s) => s.trackedQuest);
   const quests = useGame((s) => s.quests);
   // Re-render twice a second so the compass distance stays live.
@@ -122,8 +127,10 @@ export const ObjectivePill = memo(function ObjectivePill({ hidden = false }: { h
         </svg>
       </div>
       <div style={{ minWidth: 0 }}>
-        <span className="obj-title">{quest.title}</span>
-        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{current?.text ?? 'Quest complete'}</div>
+        <span className="obj-title">{questTitle(quest.id, quest.title)}</span>
+        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {current ? objectiveText(quest.id, state.progress, current.text) : t('hud.questComplete')}
+        </div>
       </div>
       {heading && (
         <div style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
@@ -148,7 +155,7 @@ export function HUD() {
     <div className="hud" aria-live="off">
       <div className="hud-top-left">
         <Vitals compact={isMobile} />
-        <div className="area-chip">{area}</div>
+        <div className="area-chip">{placeName(area)}</div>
       </div>
 
       <MiniMap />

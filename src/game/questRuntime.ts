@@ -2,6 +2,8 @@ import { useGame } from './store';
 import { QUESTS, QUEST_MAP } from './quests';
 import { bus } from './bus';
 import type { Objective, QuestState } from './types';
+import { t } from '../i18n';
+import { questTitle, objectiveText } from '../i18n/content';
 
 /**
  * Single authority for quest progression. Objectives advance from three
@@ -29,10 +31,13 @@ export function tryAdvance(questId: string): boolean {
   const objective = quest.objectives[Math.min(state.progress, quest.objectives.length - 1)];
 
   if (after?.status === 'complete') {
-    store.pushToast({ text: `“${quest.title}” complete`, kind: 'quest' });
+    store.pushToast({ text: t('toast.questDone', { title: questTitle(quest.id, quest.title) }), kind: 'quest' });
   } else {
     const next = quest.objectives[after?.progress ?? 0];
-    if (next) store.pushToast({ text: next.text, kind: 'quest' });
+    if (next) {
+      const index = after?.progress ?? 0;
+      store.pushToast({ text: objectiveText(quest.id, index, next.text), kind: 'quest' });
+    }
   }
   void objective;
   bus.emit('questUpdated', { questId });
@@ -99,7 +104,10 @@ export function notifyInventoryChange(): void {
     const lit = store.discovered.filter((d) => d.startsWith('Waystone of')).length;
     if (lit >= 3) {
       store.completeQuest('q5_stone_song');
-      store.pushToast({ text: '“The Song of Stones” complete', kind: 'quest' });
+      store.pushToast({
+        text: t('toast.questDone', { title: questTitle('q5_stone_song', 'The Song of Stones') }),
+        kind: 'quest',
+      });
       store.setQuestStatus('q6_starlit_ascent', 'available');
     }
   }

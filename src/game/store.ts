@@ -20,6 +20,7 @@ import {
 } from './saveRuntime';
 import { bus } from './bus';
 import { QUESTS } from './quests';
+import { t, onLanguageSwitch } from '../i18n';
 
 export type Screen = 'boot' | 'menu' | 'playing' | 'paused' | 'codex';
 
@@ -116,6 +117,9 @@ interface GameState {
 
 let toastSeq = 1;
 
+// Keep the boot label in the active language.
+onLanguageSwitch(() => useGame.setState({ bootLabel: t('boot.warming') }));
+
 const device = detectDevice();
 const initialGraphics: GraphicsSettings = {
   level: device.suggested,
@@ -128,7 +132,7 @@ export const useGame = create<GameState>((set, get) => ({
   screen: 'boot',
   started: false,
   bootProgress: 0,
-  bootLabel: 'Warming up the horizon…',
+  bootLabel: t('boot.warming'),
   hasSave: false,
 
   playerName: 'Wanderer',

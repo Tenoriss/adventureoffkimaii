@@ -4,20 +4,24 @@ import { useEngine } from './useGameEngine';
 import { bus } from '../game/bus';
 import type { QualityLevel } from '../config/quality';
 import { Icon } from './Icon';
+import { useT } from '../i18n';
+import { LanguagePicker } from './MainMenu';
+import { presetLabel } from '../i18n/content';
 
 interface Props {
   onClose: () => void;
   embedded?: boolean;
 }
 
-const QUALITY_NOTES: Record<QualityLevel, string> = {
-  verylow: 'Low-end phones and old laptops. No shadows, short view distance.',
-  low: 'Entry-level laptops and phones. Simple shadows, moderate distance.',
-  medium: 'Modern phones and standard laptops. Better shadows and detail.',
-  high: 'Gaming laptops and desktops. Long draw distance and full detail.',
-};
+const QUALITY_NOTE_KEYS = {
+  verylow: 'set.verylowNote',
+  low: 'set.lowNote',
+  medium: 'set.mediumNote',
+  high: 'set.highNote',
+} as const satisfies Record<QualityLevel, string>;
 
 export function SettingsPanel({ onClose, embedded }: Props) {
+  const t = useT();
   const graphics = useGame((s) => s.graphics);
   const controls = useGame((s) => s.controls);
   const audio = useGame((s) => s.audio);
@@ -29,8 +33,8 @@ export function SettingsPanel({ onClose, embedded }: Props) {
   const body = (
     <div className="panel-body">
       <div>
-        <div className="section-label">Graphics</div>
-        <div className="pill-row" role="radiogroup" aria-label="Graphics quality">
+        <div className="section-label">{t('set.graphics')}</div>
+        <div className="pill-row" role="radiogroup" aria-label={t('set.graphics')}>
           {QUALITY_LEVELS.map((level) => (
             <button
               key={level}
@@ -42,35 +46,33 @@ export function SettingsPanel({ onClose, embedded }: Props) {
                 bus.emit('playSfx', { name: 'ui' });
               }}
             >
-              {getPreset(level).label}
+              {presetLabel(level, getPreset(level).label)}
             </button>
           ))}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 8, lineHeight: 1.5 }}>
-          {QUALITY_NOTES[graphics.level]}
+          {t(QUALITY_NOTE_KEYS[graphics.level])}
         </div>
       </div>
 
       <div className="setting-row">
         <div>
-          <div className="label">Adaptive quality</div>
-          <div className="hint">
-            Automatically lowers detail if the frame rate drops. Turn off to lock your chosen preset.
-          </div>
+          <div className="label">{t('set.adaptive')}</div>
+          <div className="hint">{t('set.adaptiveHint')}</div>
         </div>
         <button
           className={`switch${graphics.auto ? ' on' : ''}`}
           role="switch"
           aria-checked={graphics.auto}
-          aria-label="Adaptive quality"
+          aria-label={t('set.adaptive')}
           onClick={() => setGraphics({ auto: !graphics.auto })}
         />
       </div>
 
       <div className="setting-row">
         <div>
-          <div className="label">Render scale</div>
-          <div className="hint">Lower means sharper performance, blurrier image. Currently {Math.round(graphics.renderScale * 100)}%.</div>
+          <div className="label">{t('set.renderScale')}</div>
+          <div className="hint">{t('set.renderScaleHint', { pct: Math.round(graphics.renderScale * 100) })}</div>
         </div>
         <input
           type="range"
@@ -83,29 +85,29 @@ export function SettingsPanel({ onClose, embedded }: Props) {
             setGraphics({ renderScale: v });
             game?.renderer.setRenderScale(v);
           }}
-          aria-label="Render scale"
+          aria-label={t('set.renderScale')}
         />
       </div>
 
       <div className="setting-row">
         <div>
-          <div className="label">Show performance</div>
-          <div className="hint">Frame rate, draw calls and triangle counts.</div>
+          <div className="label">{t('set.showPerf')}</div>
+          <div className="hint">{t('set.showPerfHint')}</div>
         </div>
         <button
           className={`switch${graphics.showFps ? ' on' : ''}`}
           role="switch"
           aria-checked={graphics.showFps}
-          aria-label="Show performance stats"
+          aria-label={t('set.showPerf')}
           onClick={() => setGraphics({ showFps: !graphics.showFps })}
         />
       </div>
 
       <div>
-        <div className="section-label">Controls</div>
+        <div className="section-label">{t('set.controls')}</div>
         <div className="setting-row">
           <div>
-            <div className="label">{isTouch ? 'Look sensitivity' : 'Mouse sensitivity'}</div>
+            <div className="label">{isTouch ? t('set.lookSens') : t('set.mouseSens')}</div>
             <div className="hint">{controls.sensitivity.toFixed(2)}×</div>
           </div>
           <input
@@ -118,18 +120,18 @@ export function SettingsPanel({ onClose, embedded }: Props) {
               setControls({ sensitivity: v });
               game?.input.setSensitivity(v);
             }}
-            aria-label="Look sensitivity"
+            aria-label={t('set.lookSens')}
           />
         </div>
         <div className="setting-row">
           <div>
-            <div className="label">Invert vertical look</div>
+            <div className="label">{t('set.invertY')}</div>
           </div>
           <button
             className={`switch${controls.invertY ? ' on' : ''}`}
             role="switch"
             aria-checked={controls.invertY}
-            aria-label="Invert vertical look"
+            aria-label={t('set.invertY')}
             onClick={() => setControls({ invertY: !controls.invertY })}
           />
         </div>
@@ -137,34 +139,34 @@ export function SettingsPanel({ onClose, embedded }: Props) {
           <>
             <div className="setting-row">
               <div>
-                <div className="label">Joystick side</div>
-                <div className="hint">Left-handed layout moves the stick to the right.</div>
+                <div className="label">{t('set.joystickSide')}</div>
+                <div className="hint">{t('set.joystickHint')}</div>
               </div>
               <div className="pill-row">
                 <button
                   className={`pill${controls.joystickSide === 'left' ? ' active' : ''}`}
                   onClick={() => setControls({ joystickSide: 'left' })}
                 >
-                  Left
+                  {t('set.left')}
                 </button>
                 <button
                   className={`pill${controls.joystickSide === 'right' ? ' active' : ''}`}
                   onClick={() => setControls({ joystickSide: 'right' })}
                 >
-                  Right
+                  {t('set.right')}
                 </button>
               </div>
             </div>
             <div className="setting-row">
               <div>
-                <div className="label">Haptic feedback</div>
-                <div className="hint">Short vibrations on jumps and interactions.</div>
+                <div className="label">{t('set.haptics')}</div>
+                <div className="hint">{t('set.hapticsHint')}</div>
               </div>
               <button
                 className={`switch${controls.haptics ? ' on' : ''}`}
                 role="switch"
                 aria-checked={controls.haptics}
-                aria-label="Haptic feedback"
+                aria-label={t('set.haptics')}
                 onClick={() => setControls({ haptics: !controls.haptics })}
               />
             </div>
@@ -173,13 +175,13 @@ export function SettingsPanel({ onClose, embedded }: Props) {
       </div>
 
       <div>
-        <div className="section-label">Audio</div>
+        <div className="section-label">{t('set.audio')}</div>
         {/* Audio sliders */}
         {(['master', 'music', 'sfx'] as const).map((key) => (
           <div className="setting-row" key={key}>
             <div>
               <div className="label" style={{ textTransform: 'capitalize' }}>
-                {key === 'sfx' ? 'Effects' : key}
+                {key === 'sfx' ? t('set.sfx') : key === 'music' ? t('set.music') : t('set.master')}
               </div>
             </div>
             <input
@@ -198,13 +200,13 @@ export function SettingsPanel({ onClose, embedded }: Props) {
         ))}
         <div className="setting-row">
           <div>
-            <div className="label">Mute all</div>
+            <div className="label">{t('set.mute')}</div>
           </div>
           <button
             className={`switch${audio.muted ? ' on' : ''}`}
             role="switch"
             aria-checked={audio.muted}
-            aria-label="Mute all audio"
+            aria-label={t('set.mute')}
             onClick={() => {
               const next = !audio.muted;
               setAudio({ muted: next });
@@ -215,11 +217,23 @@ export function SettingsPanel({ onClose, embedded }: Props) {
       </div>
 
       <div>
-        <div className="section-label">System</div>
+        <div className="section-label">{t('set.language')}</div>
+        <LanguagePicker compact />
+        <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 8, lineHeight: 1.5 }}>
+          {t('set.languageHint')}
+        </div>
+      </div>
+
+      <div>
+        <div className="section-label">{t('set.system')}</div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', lineHeight: 1.7 }}>
           {stats.gpu && <div>GPU: {stats.gpu}</div>}
           <div>
-            Quality: {getPreset(graphics.level).label} · chunks {stats.chunks} · draw calls {stats.drawCalls}
+            {t('set.systemLine', {
+              level: presetLabel(graphics.level, getPreset(graphics.level).label),
+              chunks: stats.chunks,
+              draws: stats.drawCalls,
+            })}
           </div>
         </div>
       </div>
@@ -230,10 +244,10 @@ export function SettingsPanel({ onClose, embedded }: Props) {
 
   return (
     <div className="panel-backdrop" onClick={onClose} role="presentation">
-      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
+      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('set.title')}>
         <div className="panel-head">
-          <h2>Settings</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close settings">
+          <h2>{t('set.title')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('set.title')}>
             <Icon name="close" size={16} />
           </button>
         </div>

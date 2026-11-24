@@ -40,6 +40,8 @@ import { NPCS } from '../game/dialogue';
 import { POWERUP_SPOTS, POWER_UPS, type PowerupKind } from '../game/powerups';
 import type { Interactable } from '../game/types';
 import type { QualityPreset } from '../config/quality';
+import { t } from '../i18n';
+import { placeName } from '../i18n/content';
 
 const SHARED = { userData: { shared: true } };
 
@@ -164,7 +166,7 @@ export class Scenery {
       interactables.push({
         id: `waystone:${w.id}`,
         kind: 'waystone',
-        label: `Touch ${w.name}`,
+        label: t('act.touchWaystone', { name: placeName(w.name) }),
         x: w.x,
         y: sampleHeight(w.x, w.z),
         z: w.z,
@@ -181,7 +183,7 @@ export class Scenery {
     interactables.push({
       id: 'cave:echo',
       kind: 'cave',
-      label: 'Enter Echo Hollow',
+      label: t('act.enterCave', { name: CAVE.name }),
       x: CAVE.x,
       y: sampleHeight(CAVE.x, CAVE.z),
       z: CAVE.z,
@@ -198,12 +200,12 @@ export class Scenery {
       interactables.push({
         id: `ruins:${rx}:${rz}`,
         kind: 'signpost',
-        label: 'Study the old stones',
+        label: t('act.studyRuins'),
         x: rx,
         y: sampleHeight(rx, rz),
         z: rz,
         radius: 4.5,
-        data: { text: 'Weathered glyphs: "When the stones sing, the horizon opens."' },
+        data: { textKey: 'lore.ruins' },
       });
     }
     this.place(ruinsGeo, ruinMat, ruinsEntries, true, shadows);
@@ -224,7 +226,7 @@ export class Scenery {
       interactables.push({
         id: `chest:${c.x}:${c.z}`,
         kind: 'chest',
-        label: 'Open the cache',
+        label: t('act.openCache'),
         x: c.x,
         y: sampleHeight(c.x, c.z),
         z: c.z,
@@ -245,7 +247,7 @@ export class Scenery {
       interactables.push({
         id: `fire:${v.id}`,
         kind: 'campfire',
-        label: 'Rest by the fire',
+        label: t('act.restFire'),
         x: fx,
         y: sampleHeight(fx, fz),
         z: fz,
@@ -263,12 +265,12 @@ export class Scenery {
     interactables.push({
       id: 'cairn:starlit',
       kind: 'signpost',
-      label: 'Read the Starlit Cairn',
+      label: t('act.readCairn'),
       x: cairn.x,
       y: cairn.y,
       z: cairn.z,
       radius: 5,
-      data: { cairn: true, text: 'The cairn hums. Stars wheel above the horizon.' },
+      data: { cairn: true, textKey: 'lore.cairn' },
     });
 
     // ---------------- Herbs ----------------
@@ -294,7 +296,7 @@ export class Scenery {
       interactables.push({
         id: `herb:${h.id}`,
         kind: 'herb',
-        label: `Pick ${h.name}`,
+        label: t('act.pickHerb', { name: placeName(h.name) }),
         x: h.x,
         y: hy,
         z: h.z,
@@ -315,7 +317,7 @@ export class Scenery {
       interactables.push({
         id: `stone:${spot.id}`,
         kind: 'stone',
-        label: 'Pick up a riverstone',
+        label: t('act.pickStone'),
         x: spot.x,
         y: sy,
         z: spot.z,
@@ -358,7 +360,7 @@ export class Scenery {
           interactables.push({
             id: `cap:${x.toFixed(0)}:${z.toFixed(0)}`,
             kind: 'herb',
-            label: 'Pick Embercap',
+            label: t('act.pickEmbercap'),
             x,
             y: h,
             z,
@@ -471,7 +473,7 @@ export class Scenery {
       interactables.push({
         id: `pickup:${spot.id}`,
         kind: 'signpost',
-        label: `Collect ${def.name}`,
+        label: t('act.collect', { name: placeName(def.name) }),
         x: spot.x,
         y,
         z: spot.z,

@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
+import { useT } from '../i18n';
+import type { TKey } from '../i18n/ui';
 
-const STEPS = [
-  'Mapping the valley…',
-  'Raising the mountains…',
-  'Planting the forests…',
-  'Lighting the waystones…',
-  'Waking the villagers…',
-  'Opening the horizon…',
+const STEP_KEYS: TKey[] = [
+  'boot.step1',
+  'boot.step2',
+  'boot.step3',
+  'boot.step4',
+  'boot.step5',
+  'boot.step6',
 ];
 
 export function BootScreen({ onDone, ready }: { onDone: () => void; ready: boolean }) {
+  const t = useT();
   const [step, setStep] = useState(0);
+  const STEPS = STEP_KEYS;
   const bootProgress = useGame((s) => s.bootProgress);
 
   useEffect(() => {
@@ -46,11 +50,8 @@ export function BootScreen({ onDone, ready }: { onDone: () => void; ready: boole
         <div className="progress-track">
           <div className="progress-fill" style={{ width: `${pct}%` }} />
         </div>
-        <div className="boot-label">{ready ? 'Ready.' : STEPS[step]}</div>
-        <div className="boot-tip">
-          Tip: the game saves automatically. Close the tab whenever you like — your last position, quests and satchel
-          will be waiting.
-        </div>
+        <div className="boot-label">{ready ? t('boot.ready') : t(STEPS[step])}</div>
+        <div className="boot-tip">{t('boot.tip')}</div>
       </div>
     </div>
   );

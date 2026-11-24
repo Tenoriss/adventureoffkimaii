@@ -1,4 +1,6 @@
 import { useGame } from './store';
+import { t } from '../i18n';
+import { questTitle, itemName } from '../i18n/content';
 import { DIALOGUE, NPC_MAP, resolveEntry, type DlgCtx } from './dialogue';
 import type { DialogueAction, DialogueNode } from './types';
 import { bus } from './bus';
@@ -83,7 +85,10 @@ export class DialogueController {
           store().startQuest(quest);
           bus.emit('playSfx', { name: 'quest' });
           const title = QUESTS.find((q) => q.id === quest)?.title;
-          store().pushToast({ text: title ? `Quest started · ${title}` : 'New quest accepted', kind: 'quest' });
+          store().pushToast({
+            text: title ? t('toast.questStarted', { title: questTitle(quest, title) }) : t('toast.questAccepted'),
+            kind: 'quest',
+          });
         }
         break;
       }
@@ -96,7 +101,10 @@ export class DialogueController {
           store().completeQuest(action.questId);
           if (action.questId === 'q6_starlit_ascent') store().setFlag('q6_complete', true);
           const title = QUESTS.find((q) => q.id === action.questId)?.title;
-          store().pushToast({ text: title ? `Quest complete · ${title}` : 'Quest complete', kind: 'quest' });
+          store().pushToast({
+            text: title ? t('toast.questCompleteTitle', { title: questTitle(action.questId, title) }) : t('toast.questComplete'),
+            kind: 'quest',
+          });
           bus.emit('playSfx', { name: 'quest' });
         }
         break;
@@ -104,7 +112,11 @@ export class DialogueController {
       case 'giveItem': {
         const def = ITEMS[action.itemId];
         if (store().addItem(action.itemId, action.qty) && def) {
-          store().pushToast({ text: `${def.name} received`, kind: 'item', icon: def.icon });
+          store().pushToast({
+            text: t('toast.itemReceived', { name: itemName(action.itemId, def.name) }),
+            kind: 'item',
+            icon: def.icon,
+          });
           bus.emit('playSfx', { name: 'pickup' });
         }
         break;
@@ -118,7 +130,7 @@ export class DialogueController {
         break;
       }
       case 'reveal': {
-        store().pushToast({ text: 'Location marked on your map', kind: 'info' });
+        store().pushToast({ text: t('toast.locationMarked'), kind: 'info' });
         break;
       }
       case 'trade': {
@@ -126,11 +138,15 @@ export class DialogueController {
           store().removeItem(action.give, 2);
           const def = ITEMS[action.take];
           if (store().addItem(action.take, 1) && def) {
-            store().pushToast({ text: `${def.name} traded`, kind: 'item', icon: def.icon });
+            store().pushToast({
+              text: t('toast.itemTraded', { name: itemName(action.take, def.name) }),
+              kind: 'item',
+              icon: def.icon,
+            });
             bus.emit('playSfx', { name: 'pickup' });
           }
         } else {
-          store().pushToast({ text: 'Pell needs 2 Embercaps for that', kind: 'info', icon: 'embercap' });
+          store().pushToast({ text: t('toast.pellNeedsEmbercaps'), kind: 'info', icon: 'embercap' });
         }
         break;
       }
@@ -140,7 +156,12 @@ export class DialogueController {
           store().completeQuest(action.questId);
           if (action.questId === 'q6_starlit_ascent') store().setFlag('q6_complete', true);
           const title = QUESTS.find((q) => q.id === action.questId)?.title;
-          store().pushToast({ text: title ? `Quest complete · ${title}` : 'Quest complete', kind: 'quest' });
+          store().pushToast({
+            text: title
+              ? t('toast.questCompleteTitle', { title: questTitle(action.questId, title) })
+              : t('toast.questComplete'),
+            kind: 'quest',
+          });
           bus.emit('playSfx', { name: 'quest' });
         }
         break;
@@ -161,14 +182,14 @@ export class DialogueController {
       store.removeItem('trail_ration', 1);
       store.heal(30);
       bus.emit('playSfx', { name: 'heal' });
-      return 'Ate a trail ration (+30 health)';
+      return t('toast.ateRation');
     }
     if (itemId === 'sunleaf') {
       if (store.countItem('sunleaf') <= 0) return null;
       store.removeItem('sunleaf', 1);
       store.setStamina(store.maxStamina);
       bus.emit('playSfx', { name: 'heal' });
-      return 'Chewed sunleaf (stamina restored)';
+      return t('toast.chewedSunleaf');
     }
     return null;
   }

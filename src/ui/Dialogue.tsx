@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '../game/store';
 import { useEngine } from './useGameEngine';
 import { DIALOGUE, NPC_MAP } from '../game/dialogue';
 import { bus } from '../game/bus';
+import { useT, useLang } from '../i18n';
+import { dialogueLine, dialogueOptionLabel, npcRole } from '../i18n/content';
 
 /** Simple generated portrait: hood colour comes from the NPC palette. */
 function Portrait({ robe, trim, skin, hair, mood }: { robe: string; trim: string; skin: string; hair: string; mood: string }) {
@@ -34,6 +36,8 @@ function Portrait({ robe, trim, skin, hair, mood }: { robe: string; trim: string
 }
 
 export function Dialogue() {
+  const t = useT();
+  const lang = useLang();
   const state = useGame((s) => s.dialogueState);
   const dialogueOpen = useGame((s) => s.dialogueOpen);
   const { game } = useEngine();
@@ -42,7 +46,14 @@ export function Dialogue() {
   const typeTimer = useRef<number | null>(null);
 
   const node = state ? DIALOGUE[state.nodeId] : null;
-  const line = node?.lines[state?.lineIndex ?? 0];
+  const rawLine = node?.lines[state?.lineIndex ?? 0];
+  // Localise the copy but keep the English structure authoritative. Memoised so
+  // the typewriter effect sees a stable object (a fresh object every render
+  // would restart typing forever and leave the box empty).
+  const line = useMemo(
+    () => (rawLine && state ? dialogueLine(state.nodeId, state.lineIndex, rawLine) : undefined),
+    [rawLine, state?.nodeId, state?.lineIndex, lang],
+  );
   const npc = state ? NPC_MAP[state.npcId] : null;
   const isLastLine = node ? state!.lineIndex >= node.lines.length - 1 : false;
   const showOptions = isLastLine && !!node?.options && node.options.length > 0;
@@ -123,7 +134,7 @@ export function Dialogue() {
   };
 
   return (
-    <div className="dialogue-wrap" role="dialog" aria-label={`Conversation with ${npc.name}`}>
+    <div className="dialogue-wrap" role="dialog" aria-label={t('dlg.with', { name: line.speaker })}>
       {showOptions && (
         <div className="dialogue-options">
           {node.options!.map((opt, i) => (
@@ -136,7 +147,7 @@ export function Dialogue() {
               }}
             >
               <span className="opt-index">{i + 1}.</span>
-              {opt.label}
+              {dialogueOptionLabel(state.nodeId, i, opt.label)}
             </button>
           ))}
         </div>
@@ -154,13 +165,13 @@ export function Dialogue() {
           </div>
           <div>
             <div className="name">{line.speaker}</div>
-            <div className="role">{npc.role}</div>
+            <div className="role">{npcRole(npc.id, npc.role)}</div>
           </div>
         </div>
         <div className="dialogue-text">{typed}</div>
         {ready && !showOptions && (
           <div className="dialogue-continue">
-            {isLastLine ? 'click to end' : 'click to continue'} ▸
+            {isLastLine ? t('dlg.clickEnd') : t('dlg.clickContinue')} ▸
           </div>
         )}
       </div>

@@ -25,6 +25,9 @@ import { loadSaveDataIntoGame, startAutosave } from '../game/persistence';
 import { notifyCairnReached, notifyInventoryChange, notifyPosition, notifyTalked } from '../game/questRuntime';
 import { useGame } from '../game/store';
 import { bus } from '../game/bus';
+import { t, onLanguageSwitch } from '../i18n';
+import { placeName, presetLabel } from '../i18n/content';
+import type { TKey } from '../i18n/ui';
 import { getPreset, type QualityPreset } from '../config/quality';
 import { savePlayer, setSavePlaytime } from '../game/saveRuntime';
 import { clamp } from '../world/noise';
@@ -132,12 +135,16 @@ export class Game {
     });
 
     this.scenery.build(this.preset, this.interactables);
+    // Switching language must relabel prompts and tracker text that were
+    // captured in the interactable list at build time.
+    const stopLangListener = onLanguageSwitch(() => this.refreshLocalizedLabels());
+    this.onDispose.push(stopLangListener);
     this.npcActors = buildNPCActors(this.scene);
     for (const npc of NPCS) {
       this.interactables.push({
         id: `npc:${npc.id}`,
         kind: 'npc',
-        label: `Talk to ${npc.name}`,
+        label: t('act.talkTo', { name: npc.name }),
         x: npc.x,
         y: sampleHeight(npc.x, npc.z),
         z: npc.z,
@@ -318,13 +325,13 @@ export class Game {
     if (store.countItem('trail_ration') > 0 && store.health < store.maxHealth) {
       store.removeItem('trail_ration', 1);
       store.heal(30);
-      store.pushToast({ text: 'Trail ration eaten (+30 health)', kind: 'heal', icon: 'trail_ration' });
+      store.pushToast({ text: t('toast.rationEaten'), kind: 'heal', icon: 'trail_ration' });
     } else if (store.countItem('sunleaf') > 0) {
       store.removeItem('sunleaf', 1);
       store.setStamina(store.maxStamina);
-      store.pushToast({ text: 'Sunleaf chewed (stamina restored)', kind: 'heal', icon: 'sunleaf' });
+      store.pushToast({ text: t('toast.sunleafChewed'), kind: 'heal', icon: 'sunleaf' });
     } else {
-      store.pushToast({ text: 'Nothing to eat', kind: 'info' });
+      store.pushToast({ text: t('toast.nothingToEat'), kind: 'info' });
     }
   }
 
@@ -353,14 +360,14 @@ export class Game {
         const itemId = String(target.data?.itemId ?? 'sunleaf');
         const def = ITEMS[itemId];
         if (store.addItem(itemId, 1)) {
-          store.pushToast({ text: `${def?.name ?? 'Herb'} collected`, kind: 'item', icon: def?.icon });
+          store.pushToast({ text: t('toast.herbCollected', { name: placeName(def?.name ?? 'Sunleaf') }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.6, target.z), 0xa8f0a0, { count: 14, speed: 1.6 });
           const herbId = String(target.id).split(':')[1];
           this.scenery.hideHerb(herbId);
           this.audio.play('pickup');
           this.removeInteractable(target.id);
         } else {
-          store.pushToast({ text: 'Inventory full', kind: 'info' });
+          store.pushToast({ text: t('inv.full'), kind: 'info' });
         }
         break;
       }
@@ -369,7 +376,7 @@ export class Game {
         const qty = Number(target.data?.qty ?? 1);
         const def = ITEMS[itemId];
         if (store.addItem(itemId, qty)) {
-          store.pushToast({ text: `${def?.name ?? 'Riverstone'} collected`, kind: 'item', icon: def?.icon });
+          store.pushToast({ text: t('toast.stoneCollected', { name: placeName(def?.name ?? 'Riverstone') }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.4, target.z), 0xbfe6f2, { count: 12, speed: 1.4 });
           this.audio.play('pickup');
           this.removeInteractable(target.id);
@@ -381,7 +388,7 @@ export class Game {
         const qty = Number(target.data?.qty ?? 1);
         const def = ITEMS[itemId];
         if (store.addItem(itemId, qty)) {
-          store.pushToast({ text: `${def?.name ?? 'Item'} ×${qty}`, kind: 'item', icon: def?.icon });
+          store.pushToast({ text: t('toast.itemQty', { name: placeName(def?.name ?? 'Item'), qty }), kind: 'item', icon: def?.icon });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.8, target.z), 0xffd479, { count: 26, speed: 3 });
           this.audio.play('pickup');
           this.removeInteractable(target.id);
@@ -392,12 +399,12 @@ export class Game {
         const name = String(target.data?.name ?? 'Waystone');
         const id = String(target.data?.id ?? '');
         if (store.discovered.includes(name)) {
-          store.pushToast({ text: `${name} is already awake`, kind: 'info' });
+          store.pushToast({ text: t('toast.waystoneAwake', { name: placeName(name) }), kind: 'info' });
           return;
         }
         store.discover(name);
         store.setFlag(`waystone_${id}`, true);
-        store.pushToast({ text: `${name} awakens`, kind: 'quest' });
+        store.pushToast({ text: t('toast.waystoneWakes', { name: placeName(name) }), kind: 'quest' });
         this.audio.play('waystone');
         this.particles.spawn(new THREE.Vector3(target.x, target.y + 2.2, target.z), 0x8fe3ff, {
           count: 40,
@@ -415,7 +422,7 @@ export class Game {
         store.heal(store.maxHealth);
         store.setStamina(store.maxStamina);
         this.timeOfDay = Math.min(23.5, this.timeOfDay + 2);
-        store.pushToast({ text: 'Rested. Health and stamina restored.', kind: 'heal' });
+        store.pushToast({ text: t('toast.rested'), kind: 'heal' });
         this.audio.play('heal');
         break;
       }
@@ -427,9 +434,9 @@ export class Game {
         }
         if (store.countItem('waystone_shard') === 0) {
           store.addItem('waystone_shard', 1);
-          store.pushToast({ text: 'Waystone Shard found in the dark', kind: 'item', icon: 'waystone_shard' });
+          store.pushToast({ text: t('toast.shardFound'), kind: 'item', icon: 'waystone_shard' });
         } else {
-          store.pushToast({ text: 'Echo Hollow hums around you.', kind: 'info' });
+          store.pushToast({ text: t('toast.caveHums'), kind: 'info' });
         }
         notifyInventoryChange();
         this.audio.play('discover');
@@ -442,7 +449,7 @@ export class Game {
           // objective, not a free item dispenser.
           const finalState = store.quests['q6_starlit_ascent'];
           if (finalState?.status !== 'active') {
-            store.pushToast({ text: 'The cairn is quiet. Something is still missing.', kind: 'info' });
+            store.pushToast({ text: t('toast.cairnQuiet'), kind: 'info' });
             break;
           }
           store.setFlag('cairn_reached', true);
@@ -450,9 +457,9 @@ export class Game {
           notifyCairnReached();
           if (store.countItem('horizon_compass') === 0) {
             store.addItem('horizon_compass', 1);
-            store.pushToast({ text: 'Horizon Compass recovered', kind: 'item', icon: 'horizon_compass' });
+            store.pushToast({ text: t('toast.compassFound'), kind: 'item', icon: 'horizon_compass' });
           }
-          store.pushToast({ text: 'The cairn answers. Stars wheel above the horizon.', kind: 'quest' });
+          store.pushToast({ text: t('toast.cairnAnswers'), kind: 'quest' });
           this.particles.spawn(new THREE.Vector3(target.x, target.y + 1.6, target.z), 0xcfe8ff, {
             count: 50,
             speed: 5,
@@ -462,7 +469,8 @@ export class Game {
           });
           this.audio.play('waystone');
         } else {
-          const text = String(target.data?.text ?? 'The stone is worn smooth.');
+          const textKey = target.data?.textKey as TKey | undefined;
+          const text = textKey ? t(textKey) : String(target.data?.text ?? 'The stone is worn smooth.');
           store.pushToast({ text, kind: 'info' });
         }
         break;
@@ -708,7 +716,7 @@ export class Game {
         this.lureTaken = true;
         this.scenery.hideLure();
         store.addItem('fishermans_lure', 1);
-        store.pushToast({ text: "Fisherman's Lure recovered", kind: 'item', icon: 'fishermans_lure' });
+        store.pushToast({ text: t('toast.lureRecovered'), kind: 'item', icon: 'fishermans_lure' });
         // Picking the lure up satisfies the first objective (find it).
         if ((store.quests['q4_dead_mans_lure']?.progress ?? 0) < 1) tryAdvance('q4_dead_mans_lure');
         this.particles.spawn(new THREE.Vector3(LURE.x, sampleHeight(LURE.x, LURE.z) + 0.8, LURE.z), 0xffd479, { count: 22, speed: 2.4 });
@@ -783,12 +791,42 @@ export class Game {
         const isNew = !store.discovered.includes(area);
         if (isNew) {
           store.discover(area);
-          store.pushToast({ text: `Discovered ${area}`, kind: 'quest' });
+          store.pushToast({ text: t('toast.discovered', { area: placeName(area) }), kind: 'quest' });
           this.audio.play('discover');
         }
       }
     }
   }
+
+  /** Re-translate all interactable prompts after a language change. */
+  private refreshLocalizedLabels(): void {
+    for (const item of this.interactables) {
+      if (item.kind === 'npc') {
+        const npc = NPCS.find((n) => `npc:${n.id}` === item.id);
+        if (npc) item.label = t('act.talkTo', { name: npc.name });
+      } else if (item.kind === 'waystone') {
+        item.label = t('act.touchWaystone', { name: placeName(String(item.data?.name ?? 'Waystone')) });
+      } else if (item.kind === 'cave') {
+        item.label = t('act.enterCave', { name: CAVE.name });
+      } else if (item.kind === 'chest') {
+        item.label = t('act.openCache');
+      } else if (item.kind === 'campfire') {
+        item.label = t('act.restFire');
+      } else if (item.kind === 'stone') {
+        item.label = t('act.pickStone');
+      } else if (item.kind === 'herb') {
+        item.label = t('act.pickHerb', { name: placeName(String(item.data?.name ?? 'Sunleaf')) });
+      } else if (item.kind === 'signpost') {
+        item.label = item.data?.cairn ? t('act.readCairn') : t('act.studyRuins');
+      }
+    }
+    // Push the fresh label for whatever the player is standing next to.
+    this.nearest = null;
+    const current = useGame.getState().interactLabel;
+    if (current) useGame.getState().set({ interactLabel: null });
+  }
+
+  private onDispose: (() => void)[] = [];
 
   private updateNearest(): void {
     const p = this.player.position;
@@ -854,7 +892,7 @@ export class Game {
     this.player.spawn(home.x + 6, home.z + 6);
     store.setHealth(store.maxHealth);
     store.setStamina(store.maxStamina);
-    store.pushToast({ text: 'You wake by the fire in Emberfall.', kind: 'info' });
+    store.pushToast({ text: t('toast.wakeByFire'), kind: 'info' });
     this.cameraRig.update(0.016, this.player.position, true);
     this.audio.play('heal');
   }
@@ -896,7 +934,7 @@ export class Game {
       this.lowFpsStreak = 0;
       const next = order[idx - 1] as 'verylow' | 'low' | 'medium' | 'high';
       store.setQuality(next);
-      store.pushToast({ text: `Graphics lowered to ${getPreset(next).label} for smoother play`, kind: 'info' });
+      store.pushToast({ text: t('toast.graphicsLowered', { level: presetLabel(next, getPreset(next).label) }), kind: 'info' });
     } else if (this.highFpsStreak >= 6 && idx < 3 && window.innerWidth > 900) {
       this.highFpsStreak = 0;
       const next = order[idx + 1] as 'verylow' | 'low' | 'medium' | 'high';
@@ -945,13 +983,13 @@ export class Game {
     switch (questId) {
       case 'q1_first_steps':
         return progress >= 2
-          ? { x: 28, z: 215, label: 'Sunleaf meadow' }
-          : { x: VILLAGES[0].x, z: VILLAGES[0].z, label: 'Emberfall' };
+          ? { x: 28, z: 215, label: t('obj.sunleafMeadow') }
+          : { x: VILLAGES[0].x, z: VILLAGES[0].z, label: placeName('Emberfall') };
       case 'q2_long_dark':
-        if (progress <= 1) return { x: CAVE.x, z: CAVE.z, label: 'Echo Hollow' };
+        if (progress <= 1) return { x: CAVE.x, z: CAVE.z, label: placeName('Echo Hollow') };
         return { x: -176, z: -52, label: 'Bram' };
       case 'q3_bright_water':
-        if (progress === 0) return { x: -210, z: 190, label: 'Mirror Lake' };
+        if (progress === 0) return { x: -210, z: 190, label: placeName('Mirror Lake') };
         if (progress === 1) {
           // Point at the closest shore stone the player has not picked up.
           let best = SHORE_STONES[0];
@@ -963,21 +1001,21 @@ export class Game {
               best = s;
             }
           }
-          return { x: best.x, z: best.z, label: 'Riverstones' };
+          return { x: best.x, z: best.z, label: t('obj.riverstones') };
         }
         return { x: 112, z: 158, label: 'Sela' };
       case 'q4_dead_mans_lure':
-        if (progress === 0) return { x: LURE.x, z: LURE.z, label: 'Northern lake' };
+        if (progress === 0) return { x: LURE.x, z: LURE.z, label: t('obj.northernLake') };
         return { x: 336, z: 312, label: 'Tovin' };
       case 'q5_stone_song': {
         const lit = store.discovered.filter((d) => d.startsWith('Waystone of')).length;
         const w = WAYSTONES[Math.min(lit, WAYSTONES.length - 1)];
-        return { x: w.x, z: w.z, label: w.name };
+        return { x: w.x, z: w.z, label: placeName(w.name) };
       }
       case 'q6_starlit_ascent': {
         const peak = peakLocation();
-        if (progress === 0) return { x: peak.x, z: peak.z, label: 'The northern peak' };
-        return { x: VILLAGES[0].x, z: VILLAGES[0].z, label: 'Emberfall' };
+        if (progress === 0) return { x: peak.x, z: peak.z, label: t('obj.northernPeak') };
+        return { x: VILLAGES[0].x, z: VILLAGES[0].z, label: placeName('Emberfall') };
       }
       default:
         return null;
@@ -1037,6 +1075,8 @@ export class Game {
       this.scene.remove(actor.group);
       actor.rig.dispose();
     }
+    for (const fn of this.onDispose) fn();
+    this.onDispose = [];
     this.renderer.dispose();
     this.audio.dispose();
     this.scene.clear();

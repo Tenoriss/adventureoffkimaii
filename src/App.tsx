@@ -12,6 +12,7 @@ import { BootScreen } from './ui/BootScreen';
 import { readSave, readSettings, writeSettings, writeSaveNow, setCloudAdapter, type CloudSaveAdapter } from './game/save';
 import { bus } from './game/bus';
 import { setupUnloadSave } from './game/persistence';
+import { useT } from './i18n';
 
 /**
  * Placeholder adapter. A real backend only has to implement pull/push — every
@@ -23,6 +24,7 @@ const cloudAdapterStub: CloudSaveAdapter = {
 };
 
 function GameShell() {
+  const t = useT();
   const started = useGame((s) => s.started);
   const screen = useGame((s) => s.screen);
   const setScreen = useGame((s) => s.setScreen);
@@ -75,7 +77,7 @@ function GameShell() {
 
   return (
     <div className="game-root">
-      <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Lost Horizon game view" />
+      <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={t('gl.canvasLabel')} />
 
       <div className="ui-layer">
         <HUD />
@@ -104,13 +106,10 @@ function GameShell() {
             <div style={{ fontSize: 30 }} aria-hidden>
               ⚠
             </div>
-            <h2 style={{ fontSize: 16, letterSpacing: '0.06em' }}>Graphics context lost</h2>
-            <p style={{ fontSize: 13, color: 'var(--ink-dim)', lineHeight: 1.6 }}>
-              The browser released the WebGL context — usually after switching apps or a GPU hiccup. Lost Horizon
-              restores automatically when the browser returns it. Your progress is already saved.
-            </p>
+            <h2 style={{ fontSize: 16, letterSpacing: '0.06em' }}>{t('gl.title')}</h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-dim)', lineHeight: 1.6 }}>{t('gl.body')}</p>
             <button className="btn primary" onClick={() => window.location.reload()}>
-              Reload the game
+              {t('gl.reload')}
             </button>
           </div>
         </div>

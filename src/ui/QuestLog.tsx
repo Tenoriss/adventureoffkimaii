@@ -3,8 +3,11 @@ import { QUESTS } from '../game/quests';
 import { useEngine } from './useGameEngine';
 import { bus } from '../game/bus';
 import { Icon } from './Icon';
+import { useT } from '../i18n';
+import { questTitle, questGiver, questSummary, objectiveText, objectiveHint } from '../i18n/content';
 
 export function QuestLog() {
+  const t = useT();
   const open = useGame((s) => s.questLogOpen);
   const quests = useGame((s) => s.quests);
   const tracked = useGame((s) => s.trackedQuest);
@@ -32,22 +35,21 @@ export function QuestLog() {
 
   return (
     <div className="panel-backdrop" onClick={close} role="presentation">
-      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Quest log">
+      <div className="panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('journal.title')}>
         <div className="panel-head">
           <div>
-            <h2>Journal</h2>
+            <h2>{t('journal.title')}</h2>
             <div className="sub">
-              {active.length} {active.length === 1 ? 'quest' : 'quests'} active · {done.length} complete ·{' '}
-              {discovered.length} {discovered.length === 1 ? 'place' : 'places'} discovered
+              {t('journal.sub', { active: active.length, done: done.length, places: discovered.length })}
             </div>
           </div>
-          <button className="icon-btn" onClick={close} aria-label="Close journal">
+          <button className="icon-btn" onClick={close} aria-label={t('journal.title')}>
             <Icon name="close" size={16} />
           </button>
         </div>
         <div className="panel-body">
           {visible.length === 0 && (
-            <div className="empty-note">Speak with Mira in Emberfall to begin your journey.</div>
+            <div className="empty-note">{t('journal.empty')}</div>
           )}
 
           {active.map((q) => {
@@ -56,11 +58,15 @@ export function QuestLog() {
             return (
               <div key={q.id} className={`quest-card${isTracked ? ' tracked' : ''}`}>
                 <h3>
-                  <span>{q.title}</span>
-                  {q.finalQuest && <span className="tag" style={{ marginTop: 0 }}>Final</span>}
+                  <span>{questTitle(q.id, q.title)}</span>
+                  {q.finalQuest && (
+                    <span className="tag" style={{ marginTop: 0 }}>
+                      {t('journal.final')}
+                    </span>
+                  )}
                 </h3>
-                <div className="giver">{q.giver}</div>
-                <div className="summary">{q.summary}</div>
+                <div className="giver">{questGiver(q.id, q.giver)}</div>
+                <div className="summary">{questSummary(q.id, q.summary)}</div>
                 <ul className="objectives">
                   {q.objectives.map((obj, i) => {
                     const doneObj = i < state.progress;
@@ -71,9 +77,11 @@ export function QuestLog() {
                           {doneObj ? '✔' : current ? '▸' : '·'}
                         </span>
                         <span>
-                          {obj.text}
-                          {current && obj.hint && (
-                            <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 2 }}>{obj.hint}</div>
+                          {objectiveText(q.id, i, obj.text)}
+                          {current && objectiveHint(q.id, i, obj.hint) && (
+                            <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 2 }}>
+                              {objectiveHint(q.id, i, obj.hint)}
+                            </div>
                           )}
                         </span>
                       </li>
@@ -88,7 +96,7 @@ export function QuestLog() {
                       bus.emit('playSfx', { name: 'ui' });
                     }}
                   >
-                    {isTracked ? '◉ Tracking' : 'Track this quest'}
+                    {isTracked ? t('journal.tracking') : t('journal.track')}
                   </button>
                 </div>
               </div>
@@ -98,15 +106,15 @@ export function QuestLog() {
           {done.length > 0 && (
             <>
               <div className="section-label" style={{ marginTop: 6 }}>
-                Completed
+                {t('journal.completed')}
               </div>
               {done.map((q) => (
                 <div key={q.id} className="quest-card done">
                   <h3>
-                    <span>{q.title}</span>
+                    <span>{questTitle(q.id, q.title)}</span>
                     <span style={{ color: 'var(--success)', fontSize: 13 }}>✔</span>
                   </h3>
-                  <div className="giver">{q.giver}</div>
+                  <div className="giver">{questGiver(q.id, q.giver)}</div>
                 </div>
               ))}
             </>
@@ -115,11 +123,10 @@ export function QuestLog() {
           {locked.length > 0 && (
             <>
               <div className="section-label" style={{ marginTop: 6 }}>
-                Rumours
+                {t('journal.rumours')}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', lineHeight: 1.6 }}>
-                {locked.length} more stor{locked.length === 1 ? 'y' : 'ies'} wait in the valley. Keep talking to
-                people and the road will open.
+                {t('journal.rumoursBody', { n: locked.length })}
               </div>
             </>
           )}

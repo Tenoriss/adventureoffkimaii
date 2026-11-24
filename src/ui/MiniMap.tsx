@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 import { useGame } from '../game/store';
 import { useEngine } from './useGameEngine';
 import { VILLAGES, WAYSTONES, CAVE } from '../world/features';
+import { useT } from '../i18n';
 
 /**
  * Hand-drawn style minimap. The base relief is baked once (shared with the
  * full world map) and then rotated/cropped every frame around the player.
  */
 export function MiniMap() {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { game } = useEngine();
   const compassRef = useRef<HTMLSpanElement | null>(null);
@@ -125,14 +127,14 @@ export function MiniMap() {
   }, [game]);
 
   return (
-    <div className="minimap" aria-label="Minimap">
+    <div className="minimap" aria-label={t('map.title')}>
       <canvas ref={canvasRef} />
       <span className="minimap-compass" ref={compassRef}>
         N
       </span>
       <button
         className="minimap-expand"
-        aria-label="Open the world map"
+        aria-label={t('map.open')}
         onClick={() => {
           const s = useGame.getState();
           s.set({ mapOpen: true });
