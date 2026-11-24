@@ -226,7 +226,21 @@ export class Input {
     this.state.moveX = 0;
     this.state.moveY = 0;
     this.dragLook.active = false;
+    // Losing focus mid-drag must not leave the stick pushed forward.
+    this.releaseTouch();
   };
+
+  /** Drop any held touch input (joystick, buttons, camera swipe). */
+  releaseTouch(): void {
+    this.touch.joyX = 0;
+    this.touch.joyY = 0;
+    this.touch.active = false;
+    this.touch.sprint = false;
+    this.touch.jump = false;
+    this.touch.jumpQueued = false;
+    this.touch.camera.dx = 0;
+    this.touch.camera.dy = 0;
+  }
 
   private onMouseDown = (e: MouseEvent): void => {
     if (!this.enabled) return;
@@ -351,8 +365,9 @@ export class Input {
   update(): void {
     if (this.destroyed) return;
 
-    const moveX = this.state.moveX;
-    const moveY = this.state.moveY;
+    // Movement is rebuilt from scratch every frame. Never accumulate the
+    // previous frame's value: a released joystick or lifted key would otherwise
+    // keep the character walking forever (the "stuck sprint" bug).
     this.state.moveX = 0;
     this.state.moveY = 0;
 
@@ -371,18 +386,29 @@ export class Input {
         kx /= len;
         ky /= len;
       }
-      this.state.moveX = moveX + kx + this.touch.joyX;
-      this.state.moveY = moveY + ky + this.touch.joyY;
-      const mlen = Math.hypot(this.state.moveX, this.state.moveY);
-      if (mlen > 1) {
-        this.state.moveX /= mlen;
-        this.state.moveY /= mlen;
+      // A tiny joystick deadzone keeps thumb rests from creeping.
+      let jx = this.touch.joyX;
+      let jy = this.touch.joyY;
+      if (Math.hypot(jx, jy) < 0.12) {
+        jx = 0;
+        jy = 0;
       }
+      let mx = kx + jx;
+      let my = ky + jy;
+      const mlen = Math.hypot(mx, my);
+      if (mlen > 1) {
+        mx /= mlen;
+        my /= mlen;
+      }
+      this.state.moveX = mx;
+      this.state.moveY = my;
       if (this.touch.active) this.state.usingTouch = true;
       this.pollGamepad();
-    } else {
-      this.state.moveX = 0;
-      this.state.moveY = 0;
+      const glen = Math.hypot(this.state.moveX, this.state.moveY);
+      if (glen > 1) {
+        this.state.moveX /= glen;
+        this.state.moveY /= glen;
+      }
     }
 
     this.state.lookX += this.touch.camera.dx;

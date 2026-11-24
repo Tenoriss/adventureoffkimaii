@@ -29,6 +29,8 @@ export class ChunkManager {
   private lastCz = NaN;
   private dirty = true;
   private viewRadius = 4;
+  /** Chunks baked under an older preset, rebuilt nearest-first. */
+  private staleKeys = new Set<string>();
   constructor(scene: THREE.Scene, preset: QualityPreset, seed: number) {
     this.scene = scene;
     this.preset = preset;
@@ -60,15 +62,37 @@ export class ChunkManager {
     return [...this.chunks.values()];
   }
 
+  /**
+   * Apply a new quality preset.
+   *
+   * Chunks baked under the old preset hold the old prop density, so they are
+   * re-queued at a lower priority and rebuilt nearest-first. Chunks stay on
+   * screen meanwhile, which keeps the world seamless while the upgrade streams
+   * in over the next few frames.
+   */
   setPreset(preset: QualityPreset): void {
     if (preset.level === this.preset.level) return;
+    const waterChanged = preset.waterDetail !== this.preset.waterDetail;
     this.preset = preset;
-    // Existing chunks stay on screen and are replaced naturally as the player
-    // moves; clearing them here would leave a visible hole in the world.
     this.viewRadius = preset.viewChunks + 1.5;
     this.dirty = true;
-    // Fill the bigger view radius straight away on capable hardware.
-    if (this.lastCx === this.lastCx) this.rebuildQueue(this.lastCx, this.lastCz, 1);
+    if (Number.isNaN(this.lastCx)) return;
+    if (waterChanged) {
+      // Water material is shared with the new chunks only; keep old geometry,
+      // it is disposed with the chunk.
+      this.buildAssetsWithWater(preset);
+    }
+    this.rebuildQueue(this.lastCx, this.lastCz, 1);
+    this.staleKeys = new Set(this.chunks.keys());
+    for (const key of this.staleKeys) {
+      const [cxs, czs] = key.split(',');
+      this.queue.push({
+        cx: Number(cxs),
+        cz: Number(czs),
+        priority: Math.hypot(Number(cxs) - this.lastCx, Number(czs) - this.lastCz),
+      });
+    }
+    this.queue.sort((a, b) => a.priority - b.priority);
   }
 
   /** Called every frame with the player position. */
@@ -105,8 +129,15 @@ export class ChunkManager {
       if (performance.now() - start > budgetMs && built > 0) break;
       const job = this.queue.shift()!;
       const key = `${job.cx},${job.cz}`;
-      if (this.chunks.has(key)) continue;
+      const stale = this.staleKeys.has(key);
+      if (this.chunks.has(key) && !stale) continue;
       if (this.chunks.size >= this.maxChunks) break;
+      if (stale) {
+        const old = this.chunks.get(key);
+        if (old) disposeChunk(old, this.scene);
+        this.chunks.delete(key);
+        this.staleKeys.delete(key);
+      }
       const chunk = buildChunk(job.cx, job.cz, {
         preset: this.preset,
         assets: this.assets,
@@ -129,7 +160,9 @@ export class ChunkManager {
         const d = Math.hypot(dx, dz);
         if (d > r + 0.35) continue;
         const key = `${cx + dx},${cz + dz}`;
-        if (this.chunks.has(key)) continue;
+        if (this.chunks.has(key) && !this.staleKeys.has(key)) continue;
+        // Every job is prioritised nearest-first; loading more view radius is
+        // therefore smooth even when the player stands still.
         jobs.push({ cx: cx + dx, cz: cz + dz, priority: d });
       }
     }
@@ -143,6 +176,12 @@ export class ChunkManager {
     for (const chunk of this.chunks.values()) disposeChunk(chunk, this.scene);
     this.chunks.clear();
     this.queue.length = 0;
+    this.staleKeys.clear();
+  }
+
+  private buildAssetsWithWater(preset: QualityPreset): void {
+    this.assets.dispose();
+    this.assets = new WorldAssets(preset.waterDetail ? 'high' : 'low');
   }
 
   /**

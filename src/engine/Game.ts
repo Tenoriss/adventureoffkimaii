@@ -663,6 +663,7 @@ export class Game {
 
     // ---- one-off world pickups that are not interaction prompts ----
     this.checkShorePickups(now);
+    this.updateCameraFoliage();
 
     // ---- area discovery + quest zones ----
     this.updateArea();
@@ -672,6 +673,25 @@ export class Game {
     this.autosaveTick(now);
     this.syncSaveRuntime();
     this.autoQuality(dt, now);
+  }
+
+  /** Feed the nearby tree canopies to the camera so it can dodge them. */
+  private updateCameraFoliage(): void {
+    const px = this.player.position.x;
+    const pz = this.player.position.z;
+    const out: { x: number; z: number; y: number; r: number }[] = [];
+    for (const chunk of this.chunks.loadedChunks) {
+      const cxp = chunk.cx * 64 + 32;
+      const czp = chunk.cz * 64 + 32;
+      if (Math.abs(cxp - px) > 96 || Math.abs(czp - pz) > 96) continue;
+      for (const f of chunk.foliage) {
+        const dx = f.x - px;
+        const dz = f.z - pz;
+        if (dx * dx + dz * dz > 144) continue;
+        out.push(f);
+      }
+    }
+    this.cameraRig.setFoliage(out);
   }
 
   private wasInWater = false;

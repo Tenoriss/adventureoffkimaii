@@ -97,12 +97,12 @@ export function buildGrassTuft(): THREE.BufferGeometry {
   // it reads as grass instead of a dark speck at a distance.
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + 0.4;
-    const spread = 0.24;
+    const spread = 0.3;
     const dx = Math.cos(a) * spread;
     const dz = Math.sin(a) * spread;
     const px = Math.cos(a + 1.6) * 0.06;
     const pz = Math.sin(a + 1.6) * 0.06;
-    const h = 0.5 + (i % 3) * 0.12;
+    const h = 0.62 + (i % 3) * 0.16;
     b.addTri(px - dx, 0, pz - dz, px + dx, 0, pz + dz, px + dx * 0.5, h, pz + dz * 0.5, i % 3 === 0 ? c3 : i % 2 ? c1 : c2);
   }
   return b.build();

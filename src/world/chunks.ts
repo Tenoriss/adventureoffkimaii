@@ -38,6 +38,8 @@ export interface Chunk {
   props: THREE.Group;
   lastSeen: number;
   triangleCount: number;
+  /** Trunk positions + canopy radius, used by the camera to avoid foliage. */
+  foliage: { x: number; z: number; y: number; r: number }[];
   /** Owned geometries/materials to release when the chunk unloads. */
   disposables: { dispose: () => void }[];
 }
@@ -294,7 +296,6 @@ export function buildChunk(cx: number, cz: number, opts: ChunkBuildOptions): Chu
   const flowerMatrices: THREE.Matrix4[] = [];
   const mushroomMatrices: THREE.Matrix4[] = [];
 
-  const nearVillage = VILLAGES.some((v) => Math.hypot(ox + 32 - v.x, oz + 32 - v.z) < v.radius + 20);
   const candidates = Math.round(lerp(46, 116, preset.propDensity));
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -377,8 +378,10 @@ export function buildChunk(cx: number, cz: number, opts: ChunkBuildOptions): Chu
   }
 
   // Ground detail: grass + flowers (only for mid/high quality).
-  if (preset.grassDensity > 0 && !nearVillage) {
-    const grassCandidates = Math.round(420 * preset.grassDensity);
+  // Grass also grows in villages, just thinner — a bare plaza-sized hole in the
+  // meadow is the most noticeable flaw when you walk into a town.
+  if (preset.grassDensity > 0) {
+    const grassCandidates = Math.round(640 * preset.grassDensity);
     for (let i = 0; i < grassCandidates; i++) {
       const lx = rnd() * CHUNK_SIZE;
       const lz = rnd() * CHUNK_SIZE;
@@ -389,10 +392,17 @@ export function buildChunk(cx: number, cz: number, opts: ChunkBuildOptions): Chu
       const slope = sampleSlope(wx, wz);
       if (slope > 0.55) continue;
       if (roadProximity(wx, wz, ROADS) < 2.6) continue;
-      const density = vegetationDensity(wx, wz, slope, 20);
-      if (density < 0.05 && rnd() < 0.6) continue;
-      const sc = 0.55 + rnd() * 0.6;
-      m.compose(v.set(lx, h - 0.02, lz), q.setFromAxisAngle(up, rnd() * 6.28), s.set(sc, sc * (0.75 + rnd() * 0.5), sc));
+      // Towns are cleared of trees, but not of lawn: keep the ground textured
+      // there with a thinner scatter instead of a bald green square.
+      const inTown = VILLAGES.some((v) => Math.hypot(wx - v.x, wz - v.z) < v.radius + 8);
+      if (inTown) {
+        if (rnd() < 0.25) continue;
+      } else {
+        const density = vegetationDensity(wx, wz, slope, 20);
+        if (density < 0.05 && rnd() < 0.6) continue;
+      }
+      const sc = 0.55 + rnd() * 0.5;
+      m.compose(v.set(lx, h - 0.02, lz), q.setFromAxisAngle(up, rnd() * 6.28), s.set(sc, sc * (0.8 + rnd() * 0.5), sc));
       grassMatrices.push(m.clone());
       if (rnd() < 0.1) {
         const fs = 0.8 + rnd() * 0.6;
@@ -435,6 +445,22 @@ export function buildChunk(cx: number, cz: number, opts: ChunkBuildOptions): Chu
     triangleCount += (geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3) * matrices.length * 0.6;
   };
 
+  // Remember where the canopy is so the camera can pull in instead of ending up
+  // inside a tree (which looks like a giant flat polygon across the screen).
+  const foliage: { x: number; z: number; y: number; r: number }[] = [];
+  const noteFoliage = (matrices: THREE.Matrix4[], radius: number) => {
+    for (const mm of matrices) {
+      const px = mm.elements[12];
+      const py = mm.elements[13];
+      const pz = mm.elements[14];
+      const sx = Math.hypot(mm.elements[0], mm.elements[1], mm.elements[2]);
+      foliage.push({ x: ox + px, y: py, z: oz + pz, r: radius * sx });
+    }
+  };
+  noteFoliage(pineMatrices, 1.5);
+  noteFoliage(bushyMatrices, 1.7);
+  noteFoliage(birchMatrices, 1.3);
+
   addInstanced(assets.pine, pineMatrices, foliageMat, true);
   addInstanced(assets.bushy, bushyMatrices, foliageMat, true);
   addInstanced(assets.birch, birchMatrices, foliageMat, true);
@@ -465,6 +491,7 @@ export function buildChunk(cx: number, cz: number, opts: ChunkBuildOptions): Chu
     props,
     lastSeen: performance.now(),
     triangleCount,
+    foliage,
     disposables,
   };
 }

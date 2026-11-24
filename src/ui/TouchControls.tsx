@@ -22,6 +22,7 @@ export function TouchControls() {
   const joyRef = useRef<{ id: number; cx: number; cy: number } | null>(null);
   const lookRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const [sprintLatched, setSprintLatched] = useState(false);
+  const hiddenRef = useRef(false);
   const [pressed, setPressed] = useState<string | null>(null);
 
   const vibrate = useCallback(
@@ -77,7 +78,7 @@ export function TouchControls() {
   };
 
   const onJoyEnd = (e: React.PointerEvent) => {
-    if (!joyRef.current || joyRef.current.id !== e.pointerId) return;
+    if (joyRef.current && joyRef.current.id !== e.pointerId) return;
     joyRef.current = null;
     if (knobRef.current) knobRef.current.style.transform = 'translate(0,0)';
     if (game) {
@@ -106,8 +107,47 @@ export function TouchControls() {
   };
 
   const onLookEnd = (e: React.PointerEvent) => {
-    if (lookRef.current?.id === e.pointerId) lookRef.current = null;
+    if (!lookRef.current || lookRef.current.id === e.pointerId) lookRef.current = null;
   };
+
+  /**
+   * Safety net: if the finger lifts outside the zone, the tab loses focus or a
+   * panel opens mid-drag, the browser may never deliver the element's
+   * `pointerup`. Without this the joystick stays pushed forward and the
+   * character walks on its own.
+   */
+  useEffect(() => {
+    if (!game) return;
+    const release = () => {
+      joyRef.current = null;
+      lookRef.current = null;
+      if (knobRef.current) knobRef.current.style.transform = 'translate(0,0)';
+      game.input.releaseTouch();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') release();
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      window.removeEventListener('blur', release);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [game]);
+
+  // Opening a panel or the pause menu must stop movement immediately.
+  useEffect(() => {
+    if (!game) return;
+    if (hiddenRef.current) {
+      joyRef.current = null;
+      if (knobRef.current) knobRef.current.style.transform = 'translate(0,0)';
+      game.input.releaseTouch();
+    }
+  }, [game, anyPanel, dialogueOpen, screen]);
 
   const jump = () => {
     if (!game) return;
@@ -147,6 +187,7 @@ export function TouchControls() {
   };
 
   const hidden = anyPanel || dialogueOpen || screen !== 'playing';
+  hiddenRef.current = hidden;
 
   return (
     <div
