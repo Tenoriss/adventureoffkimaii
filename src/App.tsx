@@ -9,10 +9,10 @@ import { QuestLog } from './ui/QuestLog';
 import { WorldMap } from './ui/WorldMap';
 import { MainMenu, PauseMenu } from './ui/MainMenu';
 import { BootScreen } from './ui/BootScreen';
-import { readSave, readSettings, writeSettings, writeSaveNow, setCloudAdapter, type CloudSaveAdapter } from './game/save';
+import { readSave, readSettings, writeSettings, writeSaveNow, saveUnreadable, setCloudAdapter, type CloudSaveAdapter } from './game/save';
 import { bus } from './game/bus';
 import { setupUnloadSave } from './game/persistence';
-import { useT } from './i18n';
+import { t as translate, useT } from './i18n';
 
 /**
  * Placeholder adapter. A real backend only has to implement pull/push — every
@@ -138,6 +138,13 @@ export default function App() {
     if (settings?.controls) store.set({ controls: { ...store.controls, ...settings.controls } });
     if (settings?.audio) store.set({ audio: { ...store.audio, ...settings.audio } });
     if (readSave()) store.set({ hasSave: true });
+    else if (saveUnreadable() && !document.body.dataset.saveWarned) {
+      // Something is stored but unusable: say so rather than silently showing
+      // "New journey" and letting the player think their items vanished. The
+      // marker keeps StrictMode's double-invoked effect from showing it twice.
+      document.body.dataset.saveWarned = '1';
+      store.pushToast({ text: translate('toast.saveUnreadable'), kind: 'info' });
+    }
     setCloudAdapter(cloudAdapterStub);
     const cleanup = setupUnloadSave();
     setDeviceReady(true);

@@ -433,13 +433,17 @@ export class Game {
         const itemId = String(target.data?.item ?? 'trail_ration');
         const qty = Number(target.data?.qty ?? 1);
         const def = ITEMS[itemId];
-        if (store.addItem(itemId, qty)) {
-          store.pushToast({ text: t('toast.itemQty', { name: placeName(def?.name ?? 'Item'), qty }), kind: 'item', icon: def?.icon });
-          this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.8, target.z), 0xffd479, { count: 26, speed: 3 });
-          this.audio.play('pickup');
-          this.spendNode(target.id);
-          this.removeInteractable(target.id);
+        // A full satchel used to swallow the interaction in silence: the cache
+        // stayed in the world but nothing told the player why.
+        if (!store.addItem(itemId, qty)) {
+          store.pushToast({ text: t('inv.full'), kind: 'info' });
+          break;
         }
+        store.pushToast({ text: t('toast.itemQty', { name: placeName(def?.name ?? 'Item'), qty }), kind: 'item', icon: def?.icon });
+        this.particles.spawn(new THREE.Vector3(target.x, target.y + 0.8, target.z), 0xffd479, { count: 26, speed: 3 });
+        this.audio.play('pickup');
+        this.spendNode(target.id);
+        this.removeInteractable(target.id);
         break;
       }
       case 'waystone': {

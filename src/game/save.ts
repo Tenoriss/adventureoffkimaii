@@ -1,6 +1,11 @@
 import type { AudioSettings, ControlSettings, GraphicsSettings, QuestState, SaveData } from './types';
 import { SAVE_KEY, SETTINGS_KEY, SAVE_VERSION, saveSeen, savePlaytime, saveFlags } from './saveRuntime';
 import { POWER_UPS } from './powerups';
+import { ITEMS } from '../config/items';
+import { SPAWN } from '../world/features';
+
+/** Kept local so a corrupt save never has to import the whole world graph. */
+const DEFAULT_SPAWN = SPAWN;
 
 interface StoredSettings {
   graphics: GraphicsSettings;
@@ -14,6 +19,20 @@ function safeParse<T>(raw: string | null): T | null {
     return JSON.parse(raw) as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * True when the storage slot holds *something*, but it could not be parsed into
+ * a usable save. Lets the menu tell the player why their progress is gone
+ * instead of silently offering "New journey".
+ */
+export function saveUnreadable(): boolean {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return !!raw && readSave() === null;
+  } catch {
+    return false;
   }
 }
 
@@ -33,14 +52,18 @@ export function readSave(): SaveData | null {
 
 /** Coerce every field to the shape the rest of the game assumes. */
 function sanitize(data: SaveData): SaveData | null {
-  const p = data.player;
-  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return null;
+  if (!data || typeof data !== 'object') return null;
   const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
-  const inventory = Array.isArray(data.inventory)
-    ? data.inventory
-        .filter((s) => s && typeof s.id === 'string' && Number.isFinite(s.qty) && s.qty > 0)
-        .map((s) => ({ id: s.id, qty: Math.min(99, Math.floor(s.qty)) }))
-    : [];
+  const raw = (data.player ?? {}) as Partial<SaveData['player']>;
+  // A corrupt position used to discard the whole save, which silently threw
+  // away every quest and item. Only the unused default spawn needs coordinates,
+  // so fall back to it and keep the rest of the progress.
+  const spawn = Number.isFinite(raw.x) && Number.isFinite(raw.z) ? { x: raw.x as number, z: raw.z as number } : { x: DEFAULT_SPAWN[0], z: DEFAULT_SPAWN[1] };
+  const p = { x: spawn.x, z: spawn.z, y: num(raw.y, 0), yaw: num(raw.yaw, 0) };
+  // Unknown ids can no longer be resolved (no icon, no stack size).
+  const inventory = (Array.isArray(data.inventory) ? data.inventory : [])
+    .filter((slot) => !!slot && typeof slot.id === 'string' && slot.id in ITEMS && Number.isFinite(slot.qty) && slot.qty > 0)
+    .map((slot) => ({ id: slot.id, qty: Math.min(ITEMS[slot.id].maxStack, Math.floor(slot.qty)) }));
   const quests: Record<string, QuestState> = {};
   if (data.quests && typeof data.quests === 'object') {
     for (const [id, q] of Object.entries(data.quests)) {
@@ -53,7 +76,7 @@ function sanitize(data: SaveData): SaveData | null {
   const maxHealth = 100;
   return {
     ...data,
-    player: { x: p.x, y: num(p.y, 0), z: p.z, yaw: num(p.yaw, 0) },
+    player: p,
     time: Math.min(24, Math.max(0, num(data.time, 8))),
     health: Math.min(maxHealth, Math.max(1, num(data.health, maxHealth))),
     stamina: Math.min(100, Math.max(0, num(data.stamina, 100))),

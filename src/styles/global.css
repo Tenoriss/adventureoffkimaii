@@ -1611,9 +1611,11 @@ input[type='range']::-moz-range-thumb {
 
 .map-canvas-wrap {
   position: relative;
-  width: 100%;
+  /* Square sheet (the bake is square) sized to the shorter viewport edge, so
+     the map is neither cropped nor letterboxed inside a wide panel. */
+  width: min(100%, 58vh);
   aspect-ratio: 1;
-  max-height: 58vh;
+  margin-inline: auto;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--edge);
@@ -1621,6 +1623,7 @@ input[type='range']::-moz-range-thumb {
 }
 
 .map-canvas-wrap canvas {
+  display: block;
   width: 100%;
   height: 100%;
 }

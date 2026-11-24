@@ -48,10 +48,21 @@ export function WorldMap() {
       ctx.fillStyle = '#0a1622';
       ctx.fillRect(0, 0, w, h);
 
-      const extent = 1900;
-      const s = Math.max(w, h) / extent;
+      // Fit the whole 2000 m bake inside the viewport. `max(w, h)` used to make
+      // the map as wide as the panel, which cropped ~45% of the north and south
+      // — the peak objective of the last quest could fall outside the panel.
+      const extent = 2000;
+      const s = Math.min(w, h) / extent;
       const cx = w / 2;
       const cy = h / 2;
+      // Soft backdrop for the letterboxed margins so the crop reads as a map
+      // sheet rather than a bug.
+      const sheet = Math.min(w, h);
+      const grad = ctx.createRadialGradient(cx, cy, sheet * 0.2, cx, cy, sheet * 0.75);
+      grad.addColorStop(0, 'rgba(30, 52, 74, 0.55)');
+      grad.addColorStop(1, 'rgba(8, 18, 28, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
       if (baked.current) {
         ctx.globalAlpha = 1;
         ctx.drawImage(baked.current, cx - 1000 * s, cy - 1000 * s, 2000 * s, 2000 * s);
