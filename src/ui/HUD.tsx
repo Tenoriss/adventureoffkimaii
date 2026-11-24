@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { useGame } from '../game/store';
 import { QUESTS } from '../game/quests';
 import { MiniMap } from './MiniMap';
@@ -97,6 +97,82 @@ export const ClockChip = memo(function ClockChip() {
   );
 });
 
+/**
+ * On-screen pointer toward the tracked objective.
+ *
+ * - Off-screen: a gold arrow pinned to the edge of the viewport, pointing at
+ *   the target, with the live distance underneath.
+ * - On-screen: the arrow floats above the marker in the world so the eye lands
+ *   on the exact spot.
+ *
+ * Positions come from `game.guidance()` (projected world position), not CSS, so
+ * it stays correct at any aspect ratio and on phones.
+ */
+export const ObjectivePointer = memo(function ObjectivePointer({ hidden = false }: { hidden?: boolean }) {
+  useT();
+  const trackedQuest = useGame((s) => s.trackedQuest);
+  const quests = useGame((s) => s.quests);
+  const { game } = useEngine();
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const arrowRef = useRef<HTMLDivElement | null>(null);
+  const distRef = useRef<HTMLSpanElement | null>(null);
+
+  // The pointer is updated every frame, so it writes straight to the DOM
+  // instead of going through React state (a 60 Hz re-render of the HUD would
+  // cost more than the pointer is worth on a phone).
+  useEffect(() => {
+    if (!game || hidden) return;
+    let raf = 0;
+    let lastVisible: boolean | null = null;
+    let lastDist = '';
+    const step = () => {
+      raf = requestAnimationFrame(step);
+      const g = game.guidance();
+      const wrap = wrapRef.current;
+      const arrow = arrowRef.current;
+      const distEl = distRef.current;
+      if (!wrap || !arrow || !distEl) return;
+      // Only draw the edge arrow while the target is off screen: when the
+      // beacon itself is visible the arrow is noise.
+      const show = !!g && !g.onScreen && g.distance >= 5;
+      if (show !== lastVisible) {
+        wrap.style.display = show ? '' : 'none';
+        lastVisible = show;
+      }
+      if (!show || !g) return;
+      wrap.style.left = `${g.x.toFixed(2)}%`;
+      wrap.style.top = `${g.y.toFixed(2)}%`;
+      arrow.style.transform = `rotate(${g.edgeAngle.toFixed(1)}deg)`;
+      const text = g.distance > 1000 ? `${(g.distance / 1000).toFixed(1)} km` : `${Math.round(g.distance)} m`;
+      if (text !== lastDist) {
+        distEl.textContent = text;
+        lastDist = text;
+      }
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [game, hidden, trackedQuest, quests]);
+
+  if (hidden) return null;
+
+  return (
+    <div ref={wrapRef} className="obj-pointer edge" style={{ display: 'none' }} aria-hidden>
+      <div ref={arrowRef} className="obj-pointer-arrow" style={{ transform: 'rotate(0deg)' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+          <path
+            d="M12 2.6 20.5 21 12 16.4 3.5 21z"
+            fill="#fff6e2"
+            stroke="#1a1204"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <span ref={distRef} className="obj-pointer-dist" />
+    </div>
+  );
+});
+
 export const ObjectivePill = memo(function ObjectivePill({ hidden = false }: { hidden?: boolean }) {
   const t = useT();
   const trackedQuest = useGame((s) => s.trackedQuest);
@@ -133,13 +209,22 @@ export const ObjectivePill = memo(function ObjectivePill({ hidden = false }: { h
         </div>
       </div>
       {heading && (
-        <div style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
+        <div className="obj-distance">
+          <span className="obj-dir">{compassWord(heading.angle)}</span>
           {heading.distance > 1000 ? `${(heading.distance / 1000).toFixed(1)}km` : `${Math.round(heading.distance)}m`}
         </div>
       )}
     </div>
   );
 });
+
+/** Turns a world heading into the cardinal letter the player should walk toward. */
+function compassWord(angleDeg: number): string {
+  // The pointer is drawn with 0° pointing north (−Z) and grows clockwise.
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const idx = Math.round((((angleDeg % 360) + 360) % 360) / 45) % 8;
+  return dirs[idx];
+}
 
 export function HUD() {
   const area = useGame((s) => s.area);
@@ -164,9 +249,12 @@ export function HUD() {
         <ClockChip />
       </div>
 
-      <div className="hud-bottom-left" style={{ bottom: `calc(${isTouch ? 170 : 20}px + var(--safe-bottom))` }}>
+      <div className="hud-bottom-left" style={{ bottom: `calc(${isTouch ? 148 : 20}px + var(--safe-bottom))` }}>
         <ObjectivePill hidden={dialogueOpen} />
       </div>
+
+
+      <ObjectivePointer hidden={dialogueOpen} />
 
       <div className="toast-stack">
         {toasts.map((t) => (

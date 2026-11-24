@@ -7,6 +7,7 @@ import { AudioEngine } from './AudioEngine';
 import { Input } from './Input';
 import { Player } from './Player';
 import { CameraRig } from './CameraRig';
+import { ObjectiveBeacon } from './ObjectiveBeacon';
 import { ChunkManager } from '../world/ChunkManager';
 import {
   Scenery,
@@ -55,6 +56,7 @@ export class Game {
   readonly cameraRig: CameraRig;
   readonly chunks: ChunkManager;
   readonly scenery: Scenery;
+  readonly beacon = new ObjectiveBeacon();
 
   private running = false;
   private paused = false;
@@ -115,6 +117,7 @@ export class Game {
     this.chunks = new ChunkManager(this.scene, this.preset, WORLD_SEED);
     this.scenery = new Scenery();
     this.scene.add(this.scenery.group);
+    this.scene.add(this.beacon.group);
 
     this.input = new Input(opts.canvas, {
       onPause: () => this.togglePause(),
@@ -630,6 +633,8 @@ export class Game {
     this.chunks.processQueue(now < 6000 ? 12 : 5);
     this.chunks.applyDistanceLod(this.player.position.x, this.player.position.z);
 
+    this.updateBeacon(dt);
+
     // ---- day / night ----
     const prevTime = this.timeOfDay;
     this.timeOfDay = (this.timeOfDay + (dt / DAY_LENGTH_SECONDS) * 24) % 24;
@@ -963,6 +968,98 @@ export class Game {
 
   }
 
+  /** Keep the in-world beacon planted on the current tracked objective. */
+  private updateBeacon(dt: number): void {
+    const target = this.activeObjective();
+    if (!target) {
+      this.beacon.hide();
+      return;
+    }
+    const y = sampleHeight(target.x, target.z);
+    this.beacon.setTarget(target.x, y, target.z);
+    this.beacon.update(dt, this.cameraRig.camera.position);
+  }
+
+  /** The tracked objective's world position, if a quest is running. */
+  private activeObjective(): { x: number; z: number; label: string } | null {
+    const store = useGame.getState();
+    const questId = store.trackedQuest;
+    if (!questId) return null;
+    const quest = store.quests[questId];
+    if (!quest || quest.status !== 'active') return null;
+    return this.objectiveTarget(questId, quest.progress);
+  }
+
+  /**
+   * Screen-space guidance for the 2D pointer: the heading toward the tracked
+   * objective plus where it ends up on screen (or whether it is off-screen and
+   * on which edge).
+   */
+  guidance(): {
+    angle: number;
+    distance: number;
+    label: string;
+    x: number;
+    y: number;
+    onScreen: boolean;
+    /** 0 at the screen centre, 1 at the edge — used to aim the off-screen arrow. */
+    edgeAngle: number;
+  } | null {
+    const target = this.activeObjective();
+    if (!target) return null;
+    const pos = this.player.position;
+    const dx = target.x - pos.x;
+    const dz = target.z - pos.z;
+    const distance = Math.hypot(dx, dz);
+    const angle = (Math.atan2(dx, dz) * 180) / Math.PI;
+
+    const camera = this.cameraRig.camera;
+    // Anchor on the floating diamond so the on-screen chip sits right under it.
+    const v = new THREE.Vector3(target.x, sampleHeight(target.x, target.z) + 9, target.z);
+    v.project(camera);
+    // Behind the camera: force the pointer to the side it actually belongs on.
+    const behind = v.z > 1;
+    let nx = v.x;
+    let ny = v.y;
+    if (behind) {
+      nx = -nx;
+      ny = -ny;
+    }
+    const onScreen = !behind && nx >= -0.94 && nx <= 0.94 && ny >= -0.88 && ny <= 0.88;
+
+    // Map normalised device coords to percentages inside the viewport. When the
+    // target is off-screen, slide it along its own direction until it meets the
+    // safe rectangle, so the arrow sits on the edge the player should turn to.
+    // Keep the edge arrow clear of the HUD corners (vitals top-left, clock top
+    // centre/right, objective pill bottom-left).
+    const LIMIT_X = 0.82;
+    const LIMIT_Y = 0.66;
+    let px = nx;
+    let py = ny;
+    if (!onScreen) {
+      const overX = Math.abs(nx) / LIMIT_X;
+      const overY = Math.abs(ny) / LIMIT_Y;
+      const shrink = 1 / Math.max(overX, overY, 0.0001);
+      px = nx * shrink;
+      py = ny * shrink;
+    }
+    px = THREE.MathUtils.clamp(px, -LIMIT_X, LIMIT_X);
+    py = THREE.MathUtils.clamp(py, -LIMIT_Y, LIMIT_Y);
+    const edgeAngle = (Math.atan2(py, px) * 180) / Math.PI + 90;
+
+    return {
+      angle,
+      distance,
+      label: target.label,
+      // Lift the on-screen arrow clear of the beacon column so the two do not
+      // sit on top of each other (and so gold-on-yellow stays readable).
+      x: ((px + 1) / 2) * 100,
+      y: ((1 - py) / 2) * 100 + (onScreen ? 4 : 0),
+      onScreen,
+      edgeAngle,
+    };
+  }
+
   /** Compass heading (degrees) toward the tracked objective. */
   objectiveHeading(): { angle: number; distance: number; label: string } | null {
     const store = useGame.getState();
@@ -1077,6 +1174,7 @@ export class Game {
     }
     for (const fn of this.onDispose) fn();
     this.onDispose = [];
+    this.beacon.dispose();
     this.renderer.dispose();
     this.audio.dispose();
     this.scene.clear();

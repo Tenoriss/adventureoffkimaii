@@ -1729,8 +1729,16 @@ input[type='range']::-moz-range-thumb {
   .game-title {
     letter-spacing: 0.1em;
   }
-  .objective-pill {
-    display: none;
+  /* Phones keep the objective tracker — it is how you find anything. Just make
+     it compact instead of hiding it. */
+  .hud-bottom-left .objective-pill {
+    max-width: 74vw;
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+  .hud-bottom-left .objective-pill .obj-title {
+    font-size: 9px;
+    letter-spacing: 0.1em;
   }
   .objectives li {
     font-size: 12px;
@@ -1932,4 +1940,109 @@ input[type='range']::-moz-range-thumb {
   max-width: 120px;
   text-align: center;
   transform: translateX(0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Objective pointer                                                   */
+/* ------------------------------------------------------------------ */
+
+.obj-pointer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+  z-index: 12;
+  transition:
+    left 90ms linear,
+    top 90ms linear;
+}
+
+.obj-pointer-arrow {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: #fff6e2;
+  /* Dark plate behind the glyph keeps it readable on bright grass, sand and
+     the gold beacon column. */
+  border-radius: 50%;
+  background: rgba(12, 18, 28, 0.6);
+  border: 1px solid rgba(255, 244, 221, 0.55);
+  box-shadow:
+    0 0 10px rgba(255, 212, 121, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.55);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  transition: transform 120ms linear;
+}
+
+.obj-pointer.edge .obj-pointer-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(10, 17, 28, 0.55);
+  border: 1px solid rgba(255, 212, 121, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: obj-pointer-pulse 1.9s ease-in-out infinite;
+}
+
+@keyframes obj-pointer-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 212, 121, 0.45);
+  }
+  55% {
+    box-shadow: 0 0 0 9px rgba(255, 212, 121, 0);
+  }
+}
+
+.obj-pointer-dist {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(10, 17, 28, 0.6);
+  border: 1px solid var(--edge, rgba(180, 210, 235, 0.2));
+  color: var(--ink, #e8eef6);
+  white-space: nowrap;
+}
+
+/* When the beacon is already on screen the arrow is redundant — keep the
+   distance chip so the player still sees how far it is. */
+.obj-pointer.anchored .obj-pointer-arrow {
+  display: none;
+}
+
+.obj-pointer.anchored .obj-pointer-dist {
+  background: rgba(10, 17, 28, 0.72);
+  border-color: rgba(255, 212, 121, 0.5);
+  color: #ffe6b8;
+}
+
+.obj-distance {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim, #a9bccf);
+  white-space: nowrap;
+}
+
+.obj-dir {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 212, 121, 0.16);
+  border: 1px solid rgba(255, 212, 121, 0.45);
+  color: var(--gold-bright, #ffe6b8);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
 }
